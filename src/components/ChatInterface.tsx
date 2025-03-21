@@ -151,6 +151,10 @@ const ChatInterface: React.FC = () => {
               messages={messages} 
               onReplyClick={handleReplyClick}
             />
+          </div>
+          
+          {/* Typing indicator in a fixed position */}
+          <div className="mt-2">
             {typingUsersList.length > 0 && (
               <TypingIndicator users={typingUsersList} />
             )}
