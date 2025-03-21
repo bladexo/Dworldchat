@@ -5,6 +5,9 @@ import { toast } from 'sonner';
 import { Notification } from '@/components/NotificationFeed';
 import { debounce } from 'lodash';
 
+// Constants
+const MAX_MESSAGES = 100; // Maximum number of messages to keep in history
+
 // Define the types for our chat messages
 export interface ChatMessage {
   id: string;
