@@ -43,9 +43,8 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const SOCKET_URL = import.meta.env.PROD 
-  ? window.location.origin 
-  : (import.meta.env.VITE_SERVER_URL || 'http://localhost:3000');
-const MAX_MESSAGES = 30;
+  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
+  : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Provider component
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
