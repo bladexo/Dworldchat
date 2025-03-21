@@ -5,7 +5,7 @@ import UsernameBadge from './UsernameBadge';
 import OnlineCounter from './OnlineCounter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Terminal, Send, UserPlus, Loader2, X, Wifi, WifiOff, AtSign } from 'lucide-react';
+import { Terminal, Send, UserPlus, Loader2, X, Wifi, WifiOff, AtSign, Minimize, Maximize } from 'lucide-react';
 import NotificationFeed from './NotificationFeed';
 import TypingIndicator from './TypingIndicator';
 
@@ -18,6 +18,7 @@ const ChatInterface: React.FC = () => {
   const [mentionStart, setMentionStart] = useState<number>(-1);
   const [mentionFilter, setMentionFilter] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -106,11 +107,22 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
   return (
     <>
-      {currentUser && <NotificationFeed notifications={notifications} />}
-      <div className="terminal-window w-full max-w-4xl h-[80vh] mx-auto my-8 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden">
-        <div className="terminal-header bg-black/40 px-4 py-2 flex justify-between items-center">
+      {currentUser && !isFullscreen && <NotificationFeed notifications={notifications} />}
+      <div 
+        className={`terminal-window w-full max-w-4xl h-[80vh] mx-auto my-8 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none h-screen !m-0 !p-0 rounded-none z-[99] border-none' : ''
+        }`}
+        style={isFullscreen ? { margin: 0, padding: 0 } : undefined}
+      >
+        <div className={`terminal-header bg-black/40 px-4 py-2 flex justify-between items-center flex-shrink-0 ${
+          isFullscreen ? 'border-b border-neon-green/30' : ''
+        }`}>
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-3 h-3 rounded-full mr-2"></div>
             <div className="header-button bg-yellow-500 w-3 h-3 rounded-full mr-2"></div>
@@ -131,6 +143,16 @@ const ChatInterface: React.FC = () => {
                 <span className="text-xs font-mono">DISCONNECTED</span>
               </div>
             )}
+            <Button
+              onClick={toggleFullscreen}
+              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-1"
+            >
+              {isFullscreen ? (
+                <Minimize className="h-4 w-4" />
+              ) : (
+                <Maximize className="h-4 w-4" />
+              )}
+            </Button>
             {currentUser && (
               <UsernameBadge 
                 username={currentUser.username} 
@@ -143,7 +165,9 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className="terminal-body bg-[#001100] p-4 flex flex-col h-[calc(80vh-3rem)]">
+        <div className={`terminal-body bg-[#001100] p-4 flex flex-col flex-grow overflow-hidden ${
+          isFullscreen ? 'h-[calc(100vh-40px)] !m-0' : 'h-[calc(80vh-3rem)]'
+        }`}>
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-2">
@@ -153,8 +177,7 @@ const ChatInterface: React.FC = () => {
             />
           </div>
           
-          {/* Typing indicator in a fixed position */}
-          <div className="mt-2">
+          <div className="flex-shrink-0 mt-2">
             {typingUsersList.length > 0 && (
               <TypingIndicator users={typingUsersList} />
             )}
@@ -187,7 +210,7 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSendMessage} className="sticky bottom-0 pt-4 flex flex-col gap-2 bg-[#001100]">
+            <form onSubmit={handleSendMessage} className="flex-shrink-0 pt-4 flex flex-col gap-2 bg-[#001100]">
               {replyingTo && (
                 <div className="flex items-center gap-2 p-2 rounded bg-black/40 border border-neon-green/30">
                   <span className="text-xs text-muted-foreground">Replying to</span>

@@ -47,7 +47,7 @@ const NotificationFeed: React.FC<NotificationFeedProps> = ({ notifications }) =>
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="fixed top-4 right-4 w-96 overflow-hidden bg-black/50 border border-neon-green/30 rounded-sm backdrop-blur-sm"
+      className="fixed top-0 right-0 w-96 overflow-hidden bg-black/50 border border-neon-green/30 rounded-sm backdrop-blur-sm z-[100]"
     >
       <motion.div 
         className="p-2 bg-black/80 border-b border-neon-green/30 flex items-center gap-2"

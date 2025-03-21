@@ -36,21 +36,21 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ users }) => {
   };
   
   return (
-    <div className="flex items-center gap-2 p-2 font-mono text-sm text-gray-500">
+    <div className="flex items-center gap-2 p-2 font-mono text-sm text-neon-green/70 bg-black/40 rounded-md border border-neon-green/20">
       {formatUsers()}
       <motion.div className="flex gap-1">
         <motion.span
-          className="w-1 h-1 rounded-full bg-gray-400"
+          className="w-1.5 h-1.5 rounded-full bg-neon-green"
           animate={{ opacity: [0.3, 1, 0.3] }}
           transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
         />
         <motion.span
-          className="w-1 h-1 rounded-full bg-gray-400"
+          className="w-1.5 h-1.5 rounded-full bg-neon-green"
           animate={{ opacity: [0.3, 1, 0.3] }}
           transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
         />
         <motion.span
-          className="w-1 h-1 rounded-full bg-gray-400"
+          className="w-1.5 h-1.5 rounded-full bg-neon-green"
           animate={{ opacity: [0.3, 1, 0.3] }}
           transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
         />
