@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { User } from '@/context/ChatContext';
@@ -12,23 +11,27 @@ interface UsernameBadgeProps {
 }
 
 const UsernameBadge: React.FC<UsernameBadgeProps> = ({
-  username,
+  username = 'Anonymous',
   color = '#39ff14',
   className,
   showIcon = false,
   isSystem = false,
 }) => {
+  const displayName = username || 'Anonymous';
+  const isSystemUser = isSystem || displayName.toLowerCase() === 'system';
+
   return (
     <span
       className={cn(
         'inline-flex items-center text-xs md:text-sm px-2 py-0.5 rounded font-mono font-medium',
-        isSystem ? 'bg-neon-green/10 text-neon-green' : 'bg-opacity-20 border border-opacity-30',
+        isSystemUser ? 'text-neon-green animate-pulse-subtle' : 'bg-opacity-20 border border-opacity-30',
         className
       )}
       style={{
-        backgroundColor: `${isSystem ? '' : color}20`,
-        borderColor: `${isSystem ? '' : color}30`,
-        color: color,
+        backgroundColor: isSystemUser ? 'rgba(57, 255, 20, 0.1)' : `${color}20`,
+        borderColor: isSystemUser ? 'transparent' : `${color}30`,
+        color: isSystemUser ? '#39ff14' : color,
+        textShadow: isSystemUser ? '0 0 10px rgba(57, 255, 20, 0.5)' : 'none',
       }}
     >
       {showIcon && (
@@ -39,7 +42,7 @@ const UsernameBadge: React.FC<UsernameBadgeProps> = ({
             style={{ backgroundColor: color }}></span>
         </span>
       )}
-      {isSystem ? '[system]' : username}
+      {isSystemUser ? '⟦SYSTEM⟧' : displayName}
     </span>
   );
 };

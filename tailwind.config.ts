@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+import scrollbar from 'tailwind-scrollbar';
+import animate from 'tailwindcss-animate';
 
 export default {
 	darkMode: ["class"],
@@ -74,12 +76,12 @@ export default {
 					yellow: '#ffde59',
 				},
 				hacker: {
-					dark: '#151515',
-					darker: '#0a0a0a',
-					light: '#1f1f1f',
-					accent: '#39ff14',
-					terminal: '#0a0a0a',
-					border: '#333333',
+					dark: '#000000',
+					darker: '#000000',
+					light: '#0a0a0a',
+					accent: '#ffffff',
+					terminal: '#000000',
+					border: '#1a1a1a',
 				}
 			},
 			borderRadius: {
@@ -98,19 +100,15 @@ export default {
 				},
 				'pulse-glow': {
 					'0%, 100%': { 
-						filter: 'drop-shadow(0 0 0.5rem rgba(57, 255, 20, 0.5))' 
+						filter: 'drop-shadow(0 0 0.5rem rgba(255, 255, 255, 0.3))' 
 					},
 					'50%': { 
-						filter: 'drop-shadow(0 0 0.75rem rgba(57, 255, 20, 0.7))' 
+						filter: 'drop-shadow(0 0 0.75rem rgba(255, 255, 255, 0.5))' 
 					}
 				},
 				'text-flicker': {
 					'0%, 19.999%, 22%, 62.999%, 64%, 64.999%, 70%, 100%': { opacity: '1' },
 					'20%, 21.999%, 63%, 63.999%, 65%, 69.999%': { opacity: '0.8' }
-				},
-				'scan-line': {
-					'0%': { transform: 'translateY(-100%)' },
-					'100%': { transform: 'translateY(100%)' }
 				},
 				'fade-in-up': {
 					'0%': { opacity: '0', transform: 'translateY(10px)' },
@@ -134,7 +132,6 @@ export default {
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'pulse-glow': 'pulse-glow 2s infinite',
 				'text-flicker': 'text-flicker 3s linear infinite',
-				'scan-line': 'scan-line 4s linear infinite',
 				'fade-in-up': 'fade-in-up 0.5s ease-out forwards',
 				'fade-in': 'fade-in 0.4s ease-out forwards',
 				'blink': 'blink 1s step-start infinite',
@@ -150,7 +147,7 @@ export default {
 		}
 	},
 	plugins: [
-		require('tailwind-scrollbar')({ nocompatible: true }),
-		require("tailwindcss-animate")
+		scrollbar({ nocompatible: true }),
+		animate
 	],
 } satisfies Config;

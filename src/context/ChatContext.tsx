@@ -16,6 +16,8 @@ export interface ChatMessage {
   timestamp: Date;
   userColor: string;
   mentions?: string[];
+  isSystem?: boolean;
+  type?: 'system' | 'user';
   replyTo?: {
     id: string;
     username: string;
@@ -113,26 +115,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setOnlineUsers(count);
     });
 
-    // Handle user join notification
-    newSocket.on('user_joined', ({ id, username }) => {
-      if (currentUser && id !== currentUser.id) {
-        addNotification({
-          type: 'join',
-          username,
-          timestamp: Date.now()
-        });
-      }
-    });
-
-    // Handle user leave notification
-    newSocket.on('user_left', ({ id, username }) => {
-      if (username) {
-        addNotification({
-          type: 'leave',
-          username,
-          timestamp: Date.now()
-        });
-      }
+    // Handle user leave - only update online count
+    newSocket.on('user_left', () => {
+      // No notification needed
     });
 
     return () => {
@@ -204,24 +189,30 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!socket) return;
 
     socket.on('chat_message', ({ 
+      id,
       senderId, 
       senderUsername,
       content,
       timestamp,
       userColor,
       replyTo,
-      mentions
+      mentions,
+      isSystem,
+      type
     }) => {
       const newMessage: ChatMessage = {
-        id: `${senderId}-${timestamp}`,
-        username: senderUsername,
+        id: id || `${senderId}-${timestamp}`,
+        username: senderUsername || 'SYSTEM',
         content,
         timestamp: new Date(timestamp),
         userColor: userColor || '#39ff14',
         replyTo,
-        mentions
+        mentions,
+        isSystem: isSystem || type === 'system',
+        type
       };
       
+      console.log('Received message:', newMessage);
       setMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
     });
 

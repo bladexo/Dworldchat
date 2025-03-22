@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import ChatInterface from '@/components/ChatInterface';
-import { ChatProvider } from '@/context/ChatContext';
 
 const Index = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -98,24 +97,22 @@ const Index = () => {
         }}
       />
 
-      <div className="relative w-full max-w-screen-xl mx-auto px-4">
-        <header className="py-6 text-center">
+      <div className="relative w-full max-w-screen-xl mx-auto px-2">
+        <header className="py-2 text-center">
           <h1 className="text-3xl md:text-4xl font-mono font-bold text-neon-green">
             <span className="animate-text-flicker">CHATROPOLIS</span>
           </h1>
-          <p className="text-neon-green/70 mt-2 font-mono max-w-md mx-auto">
+          <p className="text-neon-green/70 mt-1 font-mono max-w-md mx-auto">
             An anonymous space for global conversation.
             No registration. No tracking. Just chat.
           </p>
         </header>
         
-        <main className="pb-12">
-          <ChatProvider>
-            <ChatInterface />
-          </ChatProvider>
+        <main>
+          <ChatInterface />
         </main>
         
-        <footer className="text-center text-xs text-neon-green/50 py-4 font-mono">
+        <footer className="text-center text-xs text-neon-green/50 py-1 font-mono">
           <p>&gt; No logs. No history. Refreshing the page starts a new session.</p>
         </footer>
       </div>
