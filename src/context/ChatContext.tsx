@@ -39,7 +39,7 @@ interface ChatContextType {
   onlineUsers: number;
   notifications: Notification[];
   sendMessage: (content: string, replyTo?: ChatMessage) => void;
-  createUser: (cfToken: string) => void;
+  createUser: (cfToken: string) => Promise<boolean>;
   typingUsers: Map<string, { username: string; color: string }>;
   handleInputChange: (content: string) => void;
   isConnected: boolean;
@@ -136,7 +136,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const createUser = useCallback(async (cfToken: string) => {
     if (!socket || !isConnected) {
       toast.error('Waiting for server connection...');
-      return;
+      return false;
     }
 
     const username = `user_${Math.random().toString(36).substr(2, 6)}`;
@@ -148,14 +148,30 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       color
     };
 
-    socket.emit('register', {
-      username: user.username,
-      color: user.color,
-      cfToken
+    return new Promise<boolean>((resolve) => {
+      const handleError = (error: string) => {
+        toast.error(error);
+        socket?.off('error', handleError);
+        resolve(false);
+      };
+
+      const handleSuccess = () => {
+        setCurrentUser(user);
+        toast.success(`Welcome, ${username}!`);
+        socket?.off('error', handleError);
+        socket?.off('chat_message', handleSuccess);
+        resolve(true);
+      };
+
+      socket.on('error', handleError);
+      socket.on('chat_message', handleSuccess);
+
+      socket.emit('register', {
+        username: user.username,
+        color: user.color,
+        cfToken
+      });
     });
-    
-    setCurrentUser(user);
-    toast.success(`Welcome, ${username}!`);
   }, [socket, isConnected]);
 
   const sendMessage = useCallback((content: string, replyTo?: ChatMessage) => {
