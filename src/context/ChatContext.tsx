@@ -39,7 +39,7 @@ interface ChatContextType {
   onlineUsers: number;
   notifications: Notification[];
   sendMessage: (content: string, replyTo?: ChatMessage) => void;
-  createUser: () => void;
+  createUser: (cfToken: string) => void;
   typingUsers: Map<string, { username: string; color: string }>;
   handleInputChange: (content: string) => void;
   isConnected: boolean;
@@ -133,7 +133,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Create user
-  const createUser = useCallback(() => {
+  const createUser = useCallback(async (cfToken: string) => {
     if (!socket || !isConnected) {
       toast.error('Waiting for server connection...');
       return;
@@ -150,7 +150,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     socket.emit('register', {
       username: user.username,
-      color: user.color
+      color: user.color,
+      cfToken
     });
     
     setCurrentUser(user);
