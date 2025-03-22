@@ -26,6 +26,7 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [cfToken, setCfToken] = useState<string | null>(null);
+  const [tokenTimeout, setTokenTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -63,6 +64,35 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
+  // Clear token after 4.5 minutes (before Cloudflare's 5-minute expiry)
+  useEffect(() => {
+    if (cfToken) {
+      // Clear any existing timeout
+      if (tokenTimeout) {
+        clearTimeout(tokenTimeout);
+      }
+      
+      // Set new timeout
+      const timeout = setTimeout(() => {
+        setCfToken(null);
+        toast.error('Bot verification expired. Please verify again.');
+        // Reset the Turnstile widget
+        const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
+        if (turnstileElement) {
+          turnstileElement.src = turnstileElement.src;
+        }
+      }, 270000); // 4.5 minutes
+      
+      setTokenTimeout(timeout);
+    }
+    
+    return () => {
+      if (tokenTimeout) {
+        clearTimeout(tokenTimeout);
+      }
+    };
+  }, [cfToken]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (messageInput.trim()) {
@@ -98,9 +128,20 @@ const ChatInterface: React.FC = () => {
 
     setIsGenerating(true);
     try {
-      await createUser(cfToken);
+      const success = await createUser(cfToken);
+      if (!success) {
+        // Reset the Turnstile widget
+        setCfToken(null);
+        const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
+        if (turnstileElement) {
+          turnstileElement.src = turnstileElement.src;
+        }
+        toast.error('Failed to register. Please try the bot check again.');
+      }
     } catch (error) {
       console.error('Error generating identity:', error);
+      setCfToken(null);
+      toast.error('Failed to register. Please try again.');
     } finally {
       setIsGenerating(false);
     }
