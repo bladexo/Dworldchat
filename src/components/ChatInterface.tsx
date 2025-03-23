@@ -1,344 +1,334 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useChat, ChatMessage } from '@/context/ChatContext';
-import MessageList from './MessageList';
-import UsernameBadge from './UsernameBadge';
-import OnlineCounter from './OnlineCounter';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Terminal, Send, UserPlus, Loader2, X, Wifi, WifiOff, Minimize, Maximize, Volume2, VolumeX } from 'lucide-react';
-import NotificationFeed from './NotificationFeed';
-import TypingIndicator from './TypingIndicator';
-import { soundManager } from '@/utils/sound';
-import { useIsMobile } from '@/hooks/useIsMobile';
-import { cn } from '@/lib/utils';
-import ThreadModal from './ThreadModal';
-import { Turnstile } from '@marsidev/react-turnstile';
-import { toast } from 'react-hot-toast';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
+import { generateUsername, generateUserColor } from '../utils/usernameGenerator';
+import { toast } from 'sonner';
+import { Notification } from '@/components/NotificationFeed';
+import { debounce } from 'lodash';
 
-const ChatInterface: React.FC = () => {
-  const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
-  const [messageInput, setMessageInput] = useState('');
-  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const isMobile = useIsMobile();
-  const [activeThread, setActiveThread] = useState<string | null>(null);
-  const [cfToken, setCfToken] = useState<string | null>(null);
-  const [tokenTimeout, setTokenTimeout] = useState<NodeJS.Timeout | null>(null);
+// Constants
+const MAX_MESSAGES = 100; // Maximum number of messages to keep in history
 
-  const typingUsersList = Array.from(typingUsers)
-    .filter(([id, _]) => id !== currentUser?.id)
-    .map(([_, user]) => user);
+// Define the types for our chat messages
+export interface ChatMessage {
+  id: string;
+  username: string;
+  content: string;
+  timestamp: Date;
+  userColor: string;
+  mentions?: string[];
+  isSystem?: boolean;
+  type?: 'system' | 'user';
+  replyTo?: {
+    id: string;
+    username: string;
+    content: string;
+  }
+}
 
-  useEffect(() => {
-    if (currentUser && inputRef.current) {
-      inputRef.current.focus();
-    }
+// Define the user type
+export interface User {
+  id: string;
+  username: string;
+  color: string;
+}
+
+// Define the context type
+interface ChatContextType {
+  messages: ChatMessage[];
+  currentUser: User | null;
+  onlineUsers: number;
+  notifications: Notification[];
+  sendMessage: (content: string, replyTo?: ChatMessage) => void;
+  createUser: (cfToken: string) => Promise<boolean>;
+  typingUsers: Map<string, { username: string; color: string }>;
+  handleInputChange: (content: string) => void;
+  isConnected: boolean;
+}
+
+const ChatContext = createContext<ChatContextType | undefined>(undefined);
+
+const SOCKET_URL = import.meta.env.PROD 
+  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
+  : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
+
+// Provider component
+export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<number>(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [lastMessageTime, setLastMessageTime] = useState<number>(0);
+  const MESSAGE_COOLDOWN = 500; // 500ms between messages
+  const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; color: string }>>(new Map());
+  const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
+    if (!currentUser) return;
+    
+    const notificationId = `${notification.type}-${Date.now()}-${Math.random()}`;
+    const newNotification: Notification = {
+      ...notification,
+      id: notificationId
+    };
+    
+    setNotifications(prev => [newNotification, ...prev].slice(0, 50));
+
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    }, 5000);
   }, [currentUser]);
 
-  // Initialize audio on first interaction
   useEffect(() => {
-    const initAudio = () => {
-      // Try to play a silent sound to initialize audio
-      soundManager.playMessageSound();
-      // Remove the event listener after first interaction
-      document.removeEventListener('click', initAudio);
-    };
-    document.addEventListener('click', initAudio, { once: true });
-    return () => document.removeEventListener('click', initAudio);
-  }, []);
-
-  // Handle mentions and message sounds
-  useEffect(() => {
-    if (!soundEnabled) return;
+    const newSocket = io(SOCKET_URL, {
+      withCredentials: true,
+      transports: ['websocket', 'polling']
+    });
+    setSocket(newSocket);
     
-    const lastNotification = notifications[0];
-    if (lastNotification?.type === 'message') {
-      if (lastNotification.mentions?.includes(currentUser?.id || '')) {
-        soundManager.playMentionSound();
-      } else if (lastNotification.username !== currentUser?.username) {
-        soundManager.playMessageSound();
+    newSocket.on('connect', () => {
+      console.log('Connected to server');
+      setIsConnected(true);
+      // Re-register if reconnecting
+      if (currentUser) {
+        newSocket.emit('register', {
+          username: currentUser.username,
+          color: currentUser.color
+        });
       }
-    }
-  }, [notifications, soundEnabled, currentUser]);
+    });
 
-  // Clear token after 4.5 minutes (before Cloudflare's 5-minute expiry)
-  useEffect(() => {
-    if (cfToken) {
-      // Clear any existing timeout
-      if (tokenTimeout) {
-        clearTimeout(tokenTimeout);
-      }
-      
-      // Set new timeout
-      const timeout = setTimeout(() => {
-        setCfToken(null);
-        toast.error('Bot verification expired. Please verify again.');
-        // Reset the Turnstile widget
-        const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
-        if (turnstileElement) {
-          turnstileElement.src = turnstileElement.src;
-        }
-      }, 270000); // 4.5 minutes
-      
-      setTokenTimeout(timeout);
-    }
-    
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      setIsConnected(false);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      setIsConnected(false);
+      setOnlineUsers(0);
+      toast.error('Failed to connect to server');
+    });
+
+    // Simple online count update
+    newSocket.on('online_count', ({ count }) => {
+      console.log('Online users:', count);
+      setOnlineUsers(count);
+    });
+
+    // Handle user leave - only update online count
+    newSocket.on('user_left', () => {
+      // No notification needed
+    });
+
     return () => {
-      if (tokenTimeout) {
-        clearTimeout(tokenTimeout);
-      }
+      newSocket.close();
     };
-  }, [cfToken]);
+  }, [currentUser, addNotification]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (messageInput.trim()) {
-      await sendMessage(messageInput, replyingTo);
-      if (soundEnabled) {
-        soundManager.playMessageSound();
-      }
-      setMessageInput('');
-      setReplyingTo(null);
+  const validateMessage = (content: string): boolean => {
+    if (!content || typeof content !== 'string') return false;
+    if (content.length > 1000) return false;
+    if (content.trim().length === 0) return false;
+    return true;
+  };
+
+  // Create user
+  const createUser = useCallback(async (cfToken: string) => {
+    if (!socket || !isConnected) {
+      toast.error('Waiting for server connection...');
+      return false;
     }
-  };
 
-  const handleReplyClick = (message: ChatMessage) => {
-    setReplyingTo(message);
-    inputRef.current?.focus();
-  };
+    const username = `user_${Math.random().toString(36).substr(2, 6)}`;
+    const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+    
+    const user: User = {
+      id: socket.id,
+      username,
+      color
+    };
 
-  const handleCancelReply = () => {
-    setReplyingTo(null);
-  };
+    return new Promise<boolean>((resolve) => {
+      const handleError = (error: string) => {
+        toast.error(error);
+        socket?.off('error', handleError);
+        socket?.off('online_count', handleSuccess);
+        resolve(false);
+      };
 
-  const handleMessageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setMessageInput(newValue);
-    handleInputChange(newValue);
-  };
+      const handleSuccess = ({ count }: { count: number }) => {
+        setCurrentUser(user);
+        toast.success(`Welcome, ${username}!`);
+        socket?.off('error', handleError);
+        socket?.off('online_count', handleSuccess);
+        resolve(true);
+      };
 
-  const handleCreateUser = async () => {
-    if (!cfToken) {
-      toast.error('Please complete the bot check');
+      socket.on('error', handleError);
+      socket.on('online_count', handleSuccess);
+
+      socket.emit('register', {
+        username: user.username,
+        color: user.color,
+        cfToken
+      });
+
+      // Add a timeout to prevent hanging
+      setTimeout(() => {
+        socket?.off('error', handleError);
+        socket?.off('online_count', handleSuccess);
+        resolve(false);
+        toast.error('Registration timed out. Please try again.');
+      }, 10000); // 10 second timeout
+    });
+  }, [socket, isConnected]);
+
+  const sendMessage = useCallback((content: string, replyTo?: ChatMessage) => {
+    if (!socket || !currentUser) return;
+    
+    if (!validateMessage(content)) {
+      toast.error('Invalid message content');
       return;
     }
 
-    setIsGenerating(true);
-    try {
-      const success = await createUser(cfToken);
-      if (!success) {
-        // Reset the Turnstile widget
-        setCfToken(null);
-        const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
-        if (turnstileElement) {
-          turnstileElement.src = turnstileElement.src;
-        }
-        toast.error('Failed to register. Please try the bot check again.');
+    const now = Date.now();
+    if (now - lastMessageTime < MESSAGE_COOLDOWN) {
+      toast.error('Please wait before sending another message');
+      return;
+    }
+    setLastMessageTime(now);
+
+    socket.emit('chat_message', {
+      content,
+      senderId: currentUser.id,
+      senderUsername: currentUser.username,
+      userColor: currentUser.color,
+      replyTo: replyTo ? {
+        id: replyTo.id,
+        username: replyTo.username,
+        content: replyTo.content
+      } : undefined
+    });
+  }, [socket, currentUser, lastMessageTime]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('chat_message', ({ 
+      id,
+      senderId, 
+      senderUsername,
+      content,
+      timestamp,
+      userColor,
+      replyTo,
+      mentions,
+      isSystem,
+      type
+    }) => {
+      const newMessage: ChatMessage = {
+        id: id || `${senderId}-${timestamp}`,
+        username: senderUsername || 'SYSTEM',
+        content,
+        timestamp: new Date(timestamp),
+        userColor: userColor || '#39ff14',
+        replyTo,
+        mentions,
+        isSystem: isSystem || type === 'system',
+        type
+      };
+      
+      console.log('Received message:', newMessage);
+      setMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
+    });
+
+    socket.on('mention', ({ username, timestamp }) => {
+      if (currentUser) {
+        addNotification({
+          type: 'message',
+          username,
+          timestamp,
+          message: `@${username} mentioned you`
+        });
+        toast.info(`@${username} mentioned you`);
       }
-    } catch (error) {
-      console.error('Error generating identity:', error);
-      setCfToken(null);
-      toast.error('Failed to register. Please try again.');
-    } finally {
-      setIsGenerating(false);
+    });
+
+    socket.on('error', (error) => {
+      toast.error(error);
+    });
+
+    return () => {
+      socket.off('chat_message');
+      socket.off('mention');
+      socket.off('error');
+    };
+  }, [socket, currentUser, addNotification]);
+
+  // Add debounced typing handler
+  const debouncedStopTyping = useCallback(
+    debounce(() => {
+      if (socket) {
+        socket.emit('typing_stop');
+      }
+    }, 1000),
+    [socket]
+  );
+
+  // Handle input changes
+  const handleInputChange = (content: string) => {
+    if (socket && content) {
+      socket.emit('typing_start');
+      debouncedStopTyping();
     }
   };
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('user_typing', (data) => {
+      setTypingUsers(prev => {
+        const next = new Map(prev);
+        next.set(data.id, { username: data.username, color: data.color });
+        return next;
+      });
+    });
+
+    socket.on('user_stopped_typing', (data) => {
+      setTypingUsers(prev => {
+        const next = new Map(prev);
+        next.delete(data.id);
+        return next;
+      });
+    });
+
+    return () => {
+      socket.off('user_typing');
+      socket.off('user_stopped_typing');
+    };
+  }, [socket]);
+
+
+  const value = {
+  messages,
+  currentUser,
+  onlineUsers,
+  notifications,
+  sendMessage,
+  createUser,
+  typingUsers,
+  handleInputChange,
+  isConnected,
   };
 
-  const toggleSound = () => {
-    setSoundEnabled(!soundEnabled);
-    soundManager.toggleSound(!soundEnabled);
-  };
-
-  const handleThreadOpen = (messageId: string) => {
-    setActiveThread(messageId);
-  };
-
-  const handleThreadClose = () => {
-    setActiveThread(null);
-  };
-
-  return (
-    <>
-      {currentUser && <NotificationFeed notifications={notifications} />}
-      <div 
-        className={cn(
-          'terminal-window w-full max-w-4xl min-w-[320px] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col',
-          isMobile ? 'h-[100vh] !m-0 !p-0 max-w-none' : 'h-[80vh]',
-          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none h-screen !m-0 !p-0 rounded-none z-[99] border-none' : ''
-        )}
-        style={isFullscreen || isMobile ? { margin: 0, padding: 0 } : undefined}
-      >
-        <div className={cn(
-          'terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0',
-          isFullscreen || isMobile ? 'border-b border-neon-green/30' : ''
-        )}>
-          <div className="flex items-center">
-            <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <div className="header-button bg-green-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <span className="ml-2 sm:ml-4 font-mono text-[10px] sm:text-xs md:text-sm flex items-center text-neon-green">
-              <Terminal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> GLOBAL_CHAT
-            </span>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-3">
-            {isConnected ? (
-              <div className="flex items-center gap-1 text-neon-green">
-                <Wifi className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
-                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">CONNECTED</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-red-500">
-                <WifiOff className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
-              </div>
-            )}
-            <Button
-              onClick={toggleSound}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-            >
-              {soundEnabled ? (
-                <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-            </Button>
-            {!isMobile && (
-            <Button
-              onClick={toggleFullscreen}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-            >
-              {isFullscreen ? (
-                <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-            </Button>
-            )}
-            {currentUser && (
-              <UsernameBadge 
-                username={currentUser.username} 
-                color={currentUser.color}
-                showIcon 
-                className="mr-2 sm:mr-3 scale-75 sm:scale-90 md:scale-100"
-              />
-            )}
-            <OnlineCounter count={onlineUsers} />
-          </div>
-        </div>
-        
-        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden ${
-          isFullscreen ? 'h-[calc(100vh-40px)] !m-0' : 'h-[calc(85vh-3rem)]'
-        }`}>
-          <div className="scan-line-effect pointer-events-none"></div>
-          
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 pb-20">
-            <MessageList 
-              messages={messages} 
-              onReplyClick={handleReplyClick}
-              onThreadOpen={handleThreadOpen}
-            />
-          </div> 
-          
-          <div className="flex-shrink-0 mt-1 sm:mt-2">
-            {typingUsersList.length > 0 && (
-              <TypingIndicator users={typingUsersList} />
-            )}
-          </div>
-          
-          {!currentUser ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#001100]/90 backdrop-blur-sm z-10">
-              <div className="glass-panel p-4 sm:p-8 max-w-md text-center border border-neon-green/30 rounded-lg bg-black/40">
-                <h2 className="text-xl sm:text-2xl font-mono font-bold mb-2 sm:mb-4 text-neon-green">CHATROPOLIS</h2>
-                <p className="mb-4 sm:mb-6 text-sm sm:text-base text-neon-green/70">
-                  Enter the global chat anonymously. No logs, no history.
-                </p>
-                <div className="mb-4">
-                  <Turnstile
-                    siteKey={import.meta.env.VITE_CLOUDFLARE_SITE_KEY}
-                    onSuccess={(token) => setCfToken(token)}
-                    className="my-4"
-                  />
-                </div>
-                <Button 
-                  onClick={handleCreateUser}
-                  disabled={isGenerating || !cfToken}
-                  className="bg-transparent border border-neon-green text-neon-green hover:bg-neon-green/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed group text-xs sm:text-sm"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin text-neon-green animate-pulse" />
-                      <span className="font-mono animate-pulse">Generating Identity...</span>
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="font-mono">Generate Identity</span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSendMessage} className="fixed bottom-0 left-0 right-0 bg-[#000F00] px-2 py-2 border-t border-neon-green/30">
-              {replyingTo && (
-                <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 mb-2 rounded bg-black/40 border border-neon-green/30">
-                  <span className="text-[10px] sm:text-xs text-muted-foreground">Replying to</span>
-                  <UsernameBadge 
-                    username={replyingTo.username} 
-                    color={replyingTo.userColor}
-                    className="scale-75 sm:scale-90"
-                  />
-                  <span className="text-xs sm:text-sm truncate">{replyingTo.content}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 sm:h-6 sm:w-6 ml-auto text-muted-foreground hover:text-neon-green"
-                    onClick={handleCancelReply}
-                  >
-                    <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </Button>
-                </div>
-              )}
-              <div className="flex gap-2 max-w-4xl mx-auto">
-                <Input
-                  ref={inputRef}
-                  value={messageInput}
-                  onChange={handleMessageInput}
-                  placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
-                />
-                <Button 
-                  type="submit" 
-                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-3 py-2 flex-shrink-0"
-                  disabled={!messageInput.trim()}
-                >
-                  <Send className="h-4 w-4" />
-                  <span className="sr-only">Send</span>
-                </Button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-
-      {/* Thread Modal */}
-      {activeThread && messages.find(m => m.id === activeThread) && (
-        <ThreadModal
-          message={messages.find(m => m.id === activeThread)!}
-          replies={messages.filter(m => m.replyTo?.id === activeThread)}
-          onClose={handleThreadClose}
-        />
-      )}
-    </>
-  );
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
-export default ChatInterface;
+// Add this hook export
+export const useChat = () => {
+  const context = useContext(ChatContext);
+  if (context === undefined) {
+    throw new Error('useChat must be used within a ChatProvider');
+  }
+  return context;
+};
