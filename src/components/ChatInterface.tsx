@@ -22,6 +22,8 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -58,6 +60,34 @@ const ChatInterface: React.FC = () => {
       }
     }
   }, [notifications, soundEnabled, currentUser]);
+
+  // Add keyboard detection
+  useEffect(() => {
+    const handleResize = () => {
+      const newHeight = window.innerHeight;
+      if (viewportHeight > newHeight) {
+        // Keyboard is likely shown
+        setKeyboardHeight(viewportHeight - newHeight);
+      } else {
+        // Keyboard is likely hidden
+        setKeyboardHeight(0);
+      }
+      setViewportHeight(newHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewportHeight]);
+
+  // Handle input focus
+  const handleInputFocus = () => {
+    if (isMobile && isFullscreen) {
+      // Scroll to input after a short delay to ensure keyboard is shown
+      setTimeout(() => {
+        inputRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,15 +145,16 @@ const ChatInterface: React.FC = () => {
       <div 
         ref={chatWindowRef}
         className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
-          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none h-screen !m-0 !p-0 rounded-none z-[99] border-none' : ''
+          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : ''
         }`}
         style={isFullscreen ? { 
           margin: 0, 
           padding: 0, 
           height: '100%',
+          width: '100%',
           position: 'fixed',
-          bottom: 0,
-          overscrollBehavior: 'none'
+          overflow: 'hidden',
+          transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight}px)` : 'none'
         } : undefined}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
@@ -183,12 +214,14 @@ const ChatInterface: React.FC = () => {
         
         <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden ${
           isFullscreen && isMobile ? 'h-[100dvh]' : isFullscreen ? 'h-[calc(100vh-40px)]' : 'h-[calc(85vh-3rem)]'
-        }`}>
+        }`}
+          style={{
+            height: isFullscreen && isMobile ? `${viewportHeight}px` : undefined
+          }}
+        >
           <div className="scan-line-effect pointer-events-none"></div>
           
-          <div className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 ${
-            isFullscreen && isMobile ? 'h-[calc(100vh-8rem)]' : ''
-          }`}>
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2">
             <MessageList 
               messages={messages} 
               onReplyClick={handleReplyClick}
@@ -259,6 +292,7 @@ const ChatInterface: React.FC = () => {
                   ref={inputRef}
                   value={messageInput}
                   onChange={handleMessageInput}
+                  onFocus={handleInputFocus}
                   placeholder="Type your message..."
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
