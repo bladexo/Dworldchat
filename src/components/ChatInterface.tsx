@@ -59,19 +59,14 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Add viewport height management for mobile keyboards
+  // Add viewport height adjustment for mobile keyboard
   useEffect(() => {
     const setVH = () => {
-      // First we get the viewport height and we multiple it by 1% to get a value for a vh unit
       const vh = window.innerHeight * 0.01;
-      // Then we set the value in the --vh custom property to the root of the document
       document.documentElement.style.setProperty('--vh', `${vh}px`);
     };
 
-    // Initial set
-    setVH();
-
-    // Update on resize and orientation change
+    setVH(); // Set initial value
     window.addEventListener('resize', setVH);
     window.addEventListener('orientationchange', setVH);
 
@@ -138,8 +133,12 @@ const ChatInterface: React.FC = () => {
         ref={chatWindowRef}
         className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
           isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : ''
-        } ${isMobile ? 'h-[calc(var(--vh,1vh)*100)]' : 'h-screen'}`}
-        style={isFullscreen ? { margin: 0, padding: 0 } : undefined}
+        }`}
+        style={isFullscreen ? { 
+          margin: 0, 
+          padding: 0, 
+          height: isMobile ? 'calc(var(--vh, 1vh) * 100)' : '100%'
+        } : undefined}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
           isFullscreen ? 'border-b border-neon-green/30' : ''
@@ -202,7 +201,7 @@ const ChatInterface: React.FC = () => {
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 ${
-            isFullscreen && isMobile ? 'h-[calc(100vh-8rem)]' : ''
+            isFullscreen && isMobile ? 'h-[calc(var(--vh,1vh)*100-8rem)]' : ''
           }`}>
             <MessageList 
               messages={messages} 
@@ -243,12 +242,9 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <form 
-              onSubmit={handleSendMessage} 
-              className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-                isFullscreen && isMobile ? 'sticky bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
-              }`}
-            >
+            <form onSubmit={handleSendMessage} className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
+              isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
+            }`}>
               {replyingTo && (
                 <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded bg-black/40 border border-neon-green/30">
                   <span className="text-[10px] sm:text-xs text-muted-foreground">Replying to</span>
@@ -260,8 +256,6 @@ const ChatInterface: React.FC = () => {
                   <span className="text-xs sm:text-sm truncate">{replyingTo.content}</span>
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="icon"
                     className="h-5 w-5 sm:h-6 sm:w-6 ml-auto text-muted-foreground hover:text-neon-green"
                     onClick={handleCancelReply}
                   >
