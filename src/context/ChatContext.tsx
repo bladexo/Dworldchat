@@ -176,10 +176,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Generate a simple public key for the user
       const publicKey = `key_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      console.log('Emitting register event with:', { username: user.username, publicKey });
+      console.log('Emitting register event with:', { username: user.username, color: user.color });
       socket.emit('register', {
         username: user.username,
-        publicKey
+        color: user.color
       });
 
       // Add a timeout to prevent hanging
