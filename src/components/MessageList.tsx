@@ -10,12 +10,12 @@ import ThreadModal from './ThreadModal';
 interface MessageListProps {
   messages: ChatMessage[];
   onReplyClick: (message: ChatMessage) => void;
-  onThreadOpen: (messageId: string) => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick, onThreadOpen }) => {
+const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useChat();
+  const [showThread, setShowThread] = useState(false);
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
@@ -163,7 +163,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick, onThr
               variant="ghost"
               size="sm"
               className="text-neon-green/70 hover:text-neon-green flex items-center gap-1 px-2 py-1 h-6"
-              onClick={() => onThreadOpen(messageId)}
+              onClick={() => {
+                setActiveThread(messageId);
+                setShowThread(true);
+              }}
             >
               <MessageSquare className="h-3 w-3" />
               <span className="text-xs">View Thread</span>
@@ -216,12 +219,15 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick, onThr
       </div>
 
       {/* Thread Modal - only for non-system messages */}
-      {activeThread && messages.find(m => m.id === activeThread)?.username && 
+      {showThread && activeThread && messages.find(m => m.id === activeThread)?.username && 
        !messages.find(m => m.id === activeThread)?.username.toLowerCase().includes('system') && (
         <ThreadModal
           message={messages.find(m => m.id === activeThread)!}
           replies={getAllThreadReplies(activeThread, threads)}
-          onClose={() => setActiveThread(null)}
+          onClose={() => {
+            setShowThread(false);
+            setActiveThread(null);
+          }}
         />
       )}
     </>
