@@ -209,6 +209,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [socket, isConnected, currentUser]);
 
+  // Add this effect to handle initial connection and stored token
+  useEffect(() => {
+    const storedToken = localStorage.getItem('cfToken');
+    if (storedToken && !currentUser && socket && isConnected) {
+      console.log('Found stored token, attempting to restore session');
+      createUser(storedToken);
+    }
+  }, [socket, isConnected, currentUser, createUser]);
+
   const sendMessage = useCallback((content: string, replyTo?: ChatMessage) => {
     if (!socket || !currentUser) return;
     
