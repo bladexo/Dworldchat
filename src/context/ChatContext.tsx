@@ -139,11 +139,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    // If user is already registered or token exists, don't try to register again
-    if (currentUser || localStorage.getItem('cfToken')) {
-      console.log('User already registered or token exists, skipping registration');
+    // Only prevent registration if we have a current user
+    if (currentUser) {
+      console.log('User already registered, skipping registration');
       return true;
     }
+
+    // Clear any existing token before new registration
+    localStorage.removeItem('cfToken');
 
     console.log('Creating user with cfToken:', token ? 'Token present' : 'No token');
     const username = `User${Math.floor(Math.random() * 1000)}`;
