@@ -139,7 +139,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    const username = `user_${Math.random().toString(36).substr(2, 6)}`;
+    const username = `User${Math.floor(Math.random() * 1000)}`;
     const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
     
     const user: User = {
@@ -214,32 +214,30 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('chat_message', ({ 
-      id,
-      senderId, 
-      senderUsername,
-      content,
-      timestamp,
-      userColor,
-      replyTo,
-      mentions,
-      isSystem,
-      type
-    }) => {
-      const newMessage: ChatMessage = {
-        id: id || `${senderId}-${timestamp}`,
-        username: senderUsername || 'SYSTEM',
-        content,
-        timestamp: new Date(timestamp),
-        userColor: userColor || '#39ff14',
-        replyTo,
-        mentions,
-        isSystem: isSystem || type === 'system',
-        type
-      };
-      
-      console.log('Received message:', newMessage);
-      setMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
+    socket.on('registration_success', ({ username, color }) => {
+      setCurrentUser({ id: socket.id, username, color });
+      setIsConnected(true);
+    });
+
+    socket.on('error', (error) => {
+      console.error('Socket error:', error);
+      toast.error(error);
+    });
+
+    socket.on('chat_message', (message) => {
+      setMessages(prev => [...prev, message]);
+    });
+
+    socket.on('user_joined', (data) => {
+      setOnlineUsers(data.onlineCount);
+    });
+
+    socket.on('user_left', (data) => {
+      setOnlineUsers(prev => Math.max(0, prev - 1));
+    });
+
+    socket.on('online_count', (data) => {
+      setOnlineUsers(data.count);
     });
 
     socket.on('mention', ({ username, timestamp }) => {
@@ -254,14 +252,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    socket.on('error', (error) => {
-      toast.error(error);
-    });
-
     return () => {
-      socket.off('chat_message');
-      socket.off('mention');
+      socket.off('registration_success');
       socket.off('error');
+      socket.off('chat_message');
+      socket.off('user_joined');
+      socket.off('user_left');
+      socket.off('online_count');
+      socket.off('mention');
     };
   }, [socket, currentUser, addNotification]);
 
