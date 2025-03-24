@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useChat, ChatMessage } from '@/context/ChatContext';
 import MessageList from './MessageList';
 import UsernameBadge from './UsernameBadge';
@@ -9,10 +9,6 @@ import { Terminal, Send, UserPlus, Loader2, X, Wifi, WifiOff, Minimize, Maximize
 import NotificationFeed from './NotificationFeed';
 import TypingIndicator from './TypingIndicator';
 import { soundManager } from '@/utils/sound';
-import { useIsMobile } from '@/hooks/useIsMobile';
-import { cn } from '@/lib/utils';
-import ThreadModal from './ThreadModal';
-import { toast } from 'react-hot-toast';
 
 const ChatInterface: React.FC = () => {
   const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
@@ -22,8 +18,6 @@ const ChatInterface: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const isMobile = useIsMobile();
-  const [activeThread, setActiveThread] = useState<string | null>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -91,13 +85,10 @@ const ChatInterface: React.FC = () => {
   const handleCreateUser = async () => {
     setIsGenerating(true);
     try {
-      const success = await createUser();
-      if (!success) {
-        toast.error('Failed to register. Please try again.');
-      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await createUser();
     } catch (error) {
       console.error('Error generating identity:', error);
-      toast.error('Failed to register. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -112,29 +103,18 @@ const ChatInterface: React.FC = () => {
     soundManager.toggleSound(!soundEnabled);
   };
 
-  const handleThreadOpen = (messageId: string) => {
-    setActiveThread(messageId);
-  };
-
-  const handleThreadClose = () => {
-    setActiveThread(null);
-  };
-
   return (
     <>
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
-        className={cn(
-          'terminal-window w-full max-w-4xl min-w-[320px] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col',
-          isMobile ? 'h-[100vh] !m-0 !p-0 max-w-none' : 'h-[80vh]',
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
           isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none h-screen !m-0 !p-0 rounded-none z-[99] border-none' : ''
-        )}
-        style={isFullscreen || isMobile ? { margin: 0, padding: 0 } : undefined}
+        }`}
+        style={isFullscreen ? { margin: 0, padding: 0 } : undefined}
       >
-        <div className={cn(
-          'terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0',
-          isFullscreen || isMobile ? 'border-b border-neon-green/30' : ''
-        )}>
+        <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
+          isFullscreen ? 'border-b border-neon-green/30' : ''
+        }`}>
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
             <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -165,7 +145,6 @@ const ChatInterface: React.FC = () => {
                 <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
             </Button>
-            {!isMobile && (
             <Button
               onClick={toggleFullscreen}
               className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
@@ -176,7 +155,6 @@ const ChatInterface: React.FC = () => {
                 <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
             </Button>
-            )}
             {currentUser && (
               <UsernameBadge 
                 username={currentUser.username} 
@@ -194,11 +172,10 @@ const ChatInterface: React.FC = () => {
         }`}>
           <div className="scan-line-effect pointer-events-none"></div>
           
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 pb-20">
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2">
             <MessageList 
               messages={messages} 
               onReplyClick={handleReplyClick}
-              onThreadOpen={handleThreadOpen}
             />
           </div> 
           
@@ -235,9 +212,9 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSendMessage} className="fixed bottom-0 left-0 right-0 bg-[#000F00] px-2 py-2 border-t border-neon-green/30">
+            <form onSubmit={handleSendMessage} className="flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1">
               {replyingTo && (
-                <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 mb-2 rounded bg-black/40 border border-neon-green/30">
+                <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded bg-black/40 border border-neon-green/30">
                   <span className="text-[10px] sm:text-xs text-muted-foreground">Replying to</span>
                   <UsernameBadge 
                     username={replyingTo.username} 
@@ -256,7 +233,7 @@ const ChatInterface: React.FC = () => {
                   </Button>
                 </div>
               )}
-              <div className="flex gap-2 max-w-4xl mx-auto">
+              <div className="flex gap-1 sm:gap-2">
                 <Input
                   ref={inputRef}
                   value={messageInput}
@@ -266,10 +243,10 @@ const ChatInterface: React.FC = () => {
                 />
                 <Button 
                   type="submit" 
-                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-3 py-2 flex-shrink-0"
+                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0"
                   disabled={!messageInput.trim()}
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="sr-only">Send</span>
                 </Button>
               </div>
@@ -277,15 +254,6 @@ const ChatInterface: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Thread Modal */}
-      {activeThread && messages.find(m => m.id === activeThread) && (
-        <ThreadModal
-          message={messages.find(m => m.id === activeThread)!}
-          replies={messages.filter(m => m.replyTo?.id === activeThread)}
-          onClose={handleThreadClose}
-        />
-      )}
     </>
   );
 };
