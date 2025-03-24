@@ -22,8 +22,6 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
-  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -61,29 +59,27 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Add this effect to handle viewport height changes
+  // Add viewport height management for mobile keyboards
   useEffect(() => {
-    const handleResize = () => {
-      const newHeight = window.innerHeight;
-      setViewportHeight(newHeight);
-      // Detect if keyboard is likely open (threshold can be adjusted)
-      setIsKeyboardOpen(window.innerHeight < viewportHeight * 0.75);
+    const setVH = () => {
+      // First we get the viewport height and we multiple it by 1% to get a value for a vh unit
+      const vh = window.innerHeight * 0.01;
+      // Then we set the value in the --vh custom property to the root of the document
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [viewportHeight]);
+    // Initial set
+    setVH();
 
-  // Add input focus handler
-  const handleInputFocus = () => {
-    if (isMobile) {
-      setIsKeyboardOpen(true);
-    }
-  };
+    // Update on resize and orientation change
+    window.addEventListener('resize', setVH);
+    window.addEventListener('orientationchange', setVH);
 
-  const handleInputBlur = () => {
-    setIsKeyboardOpen(false);
-  };
+    return () => {
+      window.removeEventListener('resize', setVH);
+      window.removeEventListener('orientationchange', setVH);
+    };
+  }, []);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,20 +136,10 @@ const ChatInterface: React.FC = () => {
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
         ref={chatWindowRef}
-        className={`terminal-window fixed inset-0 flex flex-col ${
-          isFullscreen ? 'max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'w-full max-w-4xl min-w-[320px] mx-auto my-0 rounded-lg border border-neon-green/30'
-        }`}
-        style={{
-          height: isFullscreen ? `${viewportHeight}px` : '80vh',
-          transform: isKeyboardOpen ? `translateY(${window.innerHeight - viewportHeight}px)` : 'none',
-          transition: 'transform 0.2s ease-out',
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          overscrollBehavior: 'none',
-          WebkitOverflowScrolling: 'touch',
-        }}
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : ''
+        } ${isMobile ? 'h-[calc(var(--vh,1vh)*100)]' : 'h-screen'}`}
+        style={isFullscreen ? { margin: 0, padding: 0 } : undefined}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
           isFullscreen ? 'border-b border-neon-green/30' : ''
@@ -210,22 +196,19 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div 
-          className={`terminal-body bg-black flex flex-col flex-1 overflow-hidden`}
-          style={{
-            height: isKeyboardOpen ? `${viewportHeight - 60}px` : 'auto',
-          }}
-        >
+        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden ${
+          isFullscreen && isMobile ? 'h-[calc(var(--vh,1vh)*100-3rem)]' : isFullscreen ? 'h-[calc(100vh-40px)]' : 'h-[calc(85vh-3rem)]'
+        }`}>
           <div className="scan-line-effect pointer-events-none"></div>
           
-          <div className="flex-1 relative">
-            <div className="absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-none">
-              <MessageList 
-                messages={messages} 
-                onReplyClick={handleReplyClick}
-              />
-            </div>
-          </div>
+          <div className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 ${
+            isFullscreen && isMobile ? 'h-[calc(100vh-8rem)]' : ''
+          }`}>
+            <MessageList 
+              messages={messages} 
+              onReplyClick={handleReplyClick}
+            />
+          </div> 
           
           <div className="flex-shrink-0 mt-1 sm:mt-2">
             {typingUsersList.length > 0 && (
@@ -262,7 +245,9 @@ const ChatInterface: React.FC = () => {
           ) : (
             <form 
               onSubmit={handleSendMessage} 
-              className={`flex-shrink-0 sticky bottom-0 w-full bg-[#000F00] border-t border-neon-green/30 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 px-1 sm:px-1`}
+              className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
+                isFullscreen && isMobile ? 'sticky bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
+              }`}
             >
               {replyingTo && (
                 <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded bg-black/40 border border-neon-green/30">
@@ -289,8 +274,6 @@ const ChatInterface: React.FC = () => {
                   ref={inputRef}
                   value={messageInput}
                   onChange={handleMessageInput}
-                  onFocus={handleInputFocus}
-                  onBlur={handleInputBlur}
                   placeholder="Type your message..."
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
