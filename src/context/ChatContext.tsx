@@ -149,43 +149,24 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return new Promise<boolean>((resolve) => {
-      let isResolved = false;
-
       const handleError = (error: string) => {
-        if (isResolved) return;
-        isResolved = true;
-        console.error('Registration error:', error);
         toast.error(error);
-        cleanup();
+        socket?.off('error', handleError);
+        socket?.off('online_count', handleSuccess);
         resolve(false);
       };
 
-      const handleSuccess = () => {
-        if (isResolved) return;
-        isResolved = true;
+      const handleSuccess = ({ count }: { count: number }) => {
         setCurrentUser(user);
         toast.success(`Welcome, ${username}!`);
-        cleanup();
+        socket?.off('error', handleError);
+        socket?.off('online_count', handleSuccess);
         resolve(true);
       };
 
-      const cleanup = () => {
-        socket?.off('error', handleError);
-        socket?.off('online_count', checkSuccess);
-        socket?.off('chat_message', checkSuccess);
-      };
-
-      const checkSuccess = () => {
-        // If we receive either online_count or chat_message, consider it a success
-        handleSuccess();
-      };
-
-      // Listen for multiple success indicators
       socket.on('error', handleError);
-      socket.on('online_count', checkSuccess);
-      socket.on('chat_message', checkSuccess);
+      socket.on('online_count', handleSuccess);
 
-      // Emit registration request
       socket.emit('register', {
         username: user.username,
         color: user.color,
@@ -194,12 +175,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Add a timeout to prevent hanging
       setTimeout(() => {
-        if (!isResolved) {
-          isResolved = true;
-          cleanup();
-          toast.error('Registration timed out. Please try again.');
-          resolve(false);
-        }
+        socket?.off('error', handleError);
+        socket?.off('online_count', handleSuccess);
+        resolve(false);
+        toast.error('Registration timed out. Please try again.');
       }, 10000); // 10 second timeout
     });
   }, [socket, isConnected]);
