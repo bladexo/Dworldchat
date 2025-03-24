@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat, ChatMessage } from '@/context/ChatContext';
 import MessageList from './MessageList';
 import UsernameBadge from './UsernameBadge';
@@ -93,6 +93,21 @@ const ChatInterface: React.FC = () => {
     };
   }, [cfToken]);
 
+  // Cleanup function for Turnstile
+  useEffect(() => {
+    return () => {
+      setCfToken(null);
+    };
+  }, []);
+
+  const resetTurnstile = useCallback(() => {
+    setCfToken(null);
+    const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
+    if (turnstileElement) {
+      turnstileElement.src = turnstileElement.src;
+    }
+  }, []);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (messageInput.trim()) {
@@ -126,22 +141,12 @@ const ChatInterface: React.FC = () => {
       return;
     }
 
-    if (!isConnected) {
-      toast.error('Waiting for server connection...');
-      return;
-    }
-
     setIsGenerating(true);
     try {
       const success = await createUser(cfToken);
       if (!success) {
-        // Reset the Turnstile widget
         setCfToken(null);
-        const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
-        if (turnstileElement) {
-          turnstileElement.src = turnstileElement.src;
-        }
-        toast.error('Failed to register. Please try the bot check again.');
+        toast.error('Failed to register. Please try again.');
       }
     } catch (error) {
       console.error('Error generating identity:', error);
@@ -270,24 +275,14 @@ const ChatInterface: React.FC = () => {
                     onSuccess={(token) => setCfToken(token)}
                     onError={(error) => {
                       console.error('Turnstile error:', error);
-                      toast.error('Bot verification failed. Please try again.');
-                      // Reset the widget
-                      const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
-                      if (turnstileElement) {
-                        turnstileElement.src = turnstileElement.src;
-                      }
-                    }}
-                    onExpire={() => {
                       setCfToken(null);
-                      toast.error('Bot verification expired. Please verify again.');
                     }}
                     options={{
                       theme: 'dark',
-                      appearance: 'interaction-only',
-                      retry: 'auto',
-                      refreshExpired: 'auto'
+                      appearance: 'always',
+                      execution: 'render'
                     }}
-                    className="my-4 turnstile-container"
+                    key="turnstile-widget"
                   />
                 </div>
                 <Button 
