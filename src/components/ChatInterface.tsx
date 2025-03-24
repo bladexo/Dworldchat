@@ -133,22 +133,20 @@ const ChatInterface: React.FC = () => {
 
     setIsGenerating(true);
     try {
-      console.log('Starting user registration...');
       const success = await createUser(cfToken);
-      console.log('Registration result:', success);
-      
       if (!success) {
-        console.log('Registration failed, resetting Turnstile...');
         // Reset the Turnstile widget
         setCfToken(null);
         const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
         if (turnstileElement) {
           turnstileElement.src = turnstileElement.src;
         }
+        toast.error('Failed to register. Please try the bot check again.');
       }
     } catch (error) {
-      console.error('Error in handleCreateUser:', error);
+      console.error('Error generating identity:', error);
       setCfToken(null);
+      toast.error('Failed to register. Please try again.');
     } finally {
       setIsGenerating(false);
     }
