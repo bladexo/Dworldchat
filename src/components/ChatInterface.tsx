@@ -10,6 +10,7 @@ import NotificationFeed from './NotificationFeed';
 import TypingIndicator from './TypingIndicator';
 import { soundManager } from '@/utils/sound';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useFullscreen } from '@/hooks/use-fullscreen';
 
 const ChatInterface: React.FC = () => {
   const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
@@ -18,8 +19,9 @@ const ChatInterface: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const isMobile = useIsMobile();
+  const chatWindowRef = useRef<HTMLDivElement>(null);
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -96,8 +98,10 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+  const handleFullscreenToggle = () => {
+    if (chatWindowRef.current) {
+      toggleFullscreen();
+    }
   };
 
   const toggleSound = () => {
@@ -109,6 +113,7 @@ const ChatInterface: React.FC = () => {
     <>
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
+        ref={chatWindowRef}
         className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
           isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none h-screen !m-0 !p-0 rounded-none z-[99] border-none' : ''
         }`}
@@ -148,7 +153,7 @@ const ChatInterface: React.FC = () => {
               )}
             </Button>
             <Button
-              onClick={toggleFullscreen}
+              onClick={handleFullscreenToggle}
               className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
             >
               {isFullscreen ? (
