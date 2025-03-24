@@ -12,7 +12,6 @@ import { soundManager } from '@/utils/sound';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/lib/utils';
 import ThreadModal from './ThreadModal';
-import { Turnstile } from '@marsidev/react-turnstile';
 import { toast } from 'react-hot-toast';
 
 const ChatInterface: React.FC = () => {
@@ -25,8 +24,6 @@ const ChatInterface: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isMobile = useIsMobile();
   const [activeThread, setActiveThread] = useState<string | null>(null);
-  const [cfToken, setCfToken] = useState<string | null>(null);
-  const [tokenTimeout, setTokenTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -64,50 +61,6 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Clear token after 4.5 minutes (before Cloudflare's 5-minute expiry)
-  useEffect(() => {
-    if (cfToken) {
-      // Clear any existing timeout
-      if (tokenTimeout) {
-        clearTimeout(tokenTimeout);
-      }
-      
-      // Set new timeout
-      const timeout = setTimeout(() => {
-        setCfToken(null);
-        toast.error('Bot verification expired. Please verify again.');
-        // Reset the Turnstile widget
-        const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
-        if (turnstileElement) {
-          turnstileElement.src = turnstileElement.src;
-        }
-      }, 270000); // 4.5 minutes
-      
-      setTokenTimeout(timeout);
-    }
-    
-    return () => {
-      if (tokenTimeout) {
-        clearTimeout(tokenTimeout);
-      }
-    };
-  }, [cfToken]);
-
-  // Cleanup function for Turnstile
-  useEffect(() => {
-    return () => {
-      setCfToken(null);
-    };
-  }, []);
-
-  const resetTurnstile = useCallback(() => {
-    setCfToken(null);
-    const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
-    if (turnstileElement) {
-      turnstileElement.src = turnstileElement.src;
-    }
-  }, []);
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (messageInput.trim()) {
@@ -136,41 +89,19 @@ const ChatInterface: React.FC = () => {
   };
 
   const handleCreateUser = async () => {
-    if (!cfToken) {
-      toast.error('Please complete the bot verification first');
-      return;
-    }
-
     setIsGenerating(true);
     try {
-      const success = await createUser(cfToken);
+      const success = await createUser();
       if (!success) {
-        setCfToken(null);
         toast.error('Failed to register. Please try again.');
       }
     } catch (error) {
       console.error('Error generating identity:', error);
-      setCfToken(null);
       toast.error('Failed to register. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   };
-
-  // Store token in localStorage when it's received
-  useEffect(() => {
-    if (cfToken) {
-      localStorage.setItem('cfToken', cfToken);
-    }
-  }, [cfToken]);
-
-  // Clear token when component unmounts
-  useEffect(() => {
-    return () => {
-      localStorage.removeItem('cfToken');
-      setCfToken(null);
-    };
-  }, []);
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
@@ -284,29 +215,9 @@ const ChatInterface: React.FC = () => {
                 <p className="mb-4 sm:mb-6 text-sm sm:text-base text-neon-green/70">
                   Enter the global chat anonymously. No logs, no history.
                 </p>
-                <div className="mb-4">
-                  <Turnstile
-                    siteKey={import.meta.env.VITE_CLOUDFLARE_SITE_KEY}
-                    onSuccess={(token) => {
-                      console.log('Turnstile success, token received');
-                      setCfToken(token);
-                    }}
-                    onError={(error) => {
-                      console.error('Turnstile error:', error);
-                      setCfToken(null);
-                      toast.error('Bot verification failed. Please try again.');
-                    }}
-                    options={{
-                      theme: 'dark',
-                      appearance: 'always',
-                      execution: 'render'
-                    }}
-                    key="turnstile-widget"
-                  />
-                </div>
                 <Button 
                   onClick={handleCreateUser}
-                  disabled={isGenerating || !cfToken}
+                  disabled={isGenerating}
                   className="bg-transparent border border-neon-green text-neon-green hover:bg-neon-green/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed group text-xs sm:text-sm"
                 >
                   {isGenerating ? (
