@@ -89,24 +89,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     newSocket.on('connect', () => {
       console.log('Connected to server');
       setIsConnected(true);
-      // Re-register if reconnecting and we have a current user
-      if (currentUser) {
-        const storedToken = localStorage.getItem('cfToken');
-        if (storedToken) {
-          console.log('Re-registering user after reconnection with stored token');
-          // Use a small delay to ensure the socket is ready
-          setTimeout(() => {
-            newSocket.emit('register', {
-              username: currentUser.username,
-              color: currentUser.color,
-              cfToken: storedToken
-            });
-          }, 100);
-        } else {
-          console.log('No stored token found for re-registration');
-          setCurrentUser(null);
-          toast.error('Session expired. Please verify again.');
-        }
+      // Only attempt re-registration if we have a current user but no stored token
+      if (currentUser && !localStorage.getItem('cfToken')) {
+        console.log('No stored token found for re-registration');
+        setCurrentUser(null);
+        toast.error('Session expired. Please verify again.');
       }
     });
 
@@ -152,9 +139,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    // If user is already registered, don't try to register again
-    if (currentUser) {
-      console.log('User already registered, skipping registration');
+    // If user is already registered or token exists, don't try to register again
+    if (currentUser || localStorage.getItem('cfToken')) {
+      console.log('User already registered or token exists, skipping registration');
       return true;
     }
 
@@ -180,6 +167,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const handleSuccess = (data: { username: string; color: string }) => {
         console.log('Registration success:', data);
         setCurrentUser(user);
+        // Store the token only on successful registration
+        localStorage.setItem('cfToken', token);
         toast.success(`Welcome, ${username}!`);
         socket?.off('error', handleError);
         socket?.off('registration_success', handleSuccess);
@@ -194,8 +183,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.on('registration_success', handleSuccess);
 
       console.log('Emitting register event with:', { username, color, cfToken: token ? 'Token present' : 'No token' });
-      socket.emit('register', {
-        username: user.username,
+    socket.emit('register', {
+      username: user.username,
         color: user.color,
         cfToken: token
       });
