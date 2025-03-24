@@ -10,9 +10,10 @@ import ThreadModal from './ThreadModal';
 interface MessageListProps {
   messages: ChatMessage[];
   onReplyClick: (message: ChatMessage) => void;
+  onThreadOpen: (messageId: string) => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => {
+const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick, onThreadOpen }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useChat();
   const [activeThread, setActiveThread] = useState<string | null>(null);
@@ -155,14 +156,14 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
           renderMessage(reply, depth + 1, index === displayedReplies.length - 1)
         ))}
 
-        {/* Thread control buttons - only for non-system messages */}
-        {!isSystem && hasMoreThanThreeReplies && depth === 0 && (
-          <div className="flex items-center gap-2 mt-2" style={{ marginLeft: '12px' }}>
+        {/* Thread control buttons - show for any non-system message with >3 replies */}
+        {!isSystem && hasMoreThanThreeReplies && (
+          <div className="flex items-center gap-2 mt-2" style={{ marginLeft: depth > 0 ? `${depth * 12 + 12}px` : '12px' }}>
             <Button
               variant="ghost"
               size="sm"
               className="text-neon-green/70 hover:text-neon-green flex items-center gap-1 px-2 py-1 h-6"
-              onClick={() => setActiveThread(messageId)}
+              onClick={() => onThreadOpen(messageId)}
             >
               <MessageSquare className="h-3 w-3" />
               <span className="text-xs">View Thread</span>
@@ -211,8 +212,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
     <>
       <div className="space-y-2 py-2">
         {mainMessages.map(message => renderMessage(message))}
-      <div ref={messagesEndRef} />
-    </div>
+        <div ref={messagesEndRef} />
+      </div>
 
       {/* Thread Modal - only for non-system messages */}
       {activeThread && messages.find(m => m.id === activeThread)?.username && 
