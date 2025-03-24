@@ -135,12 +135,26 @@ const ChatInterface: React.FC = () => {
     handleInputChange(newValue);
   };
 
-  const handleCreateUser = () => {
+  const handleCreateUser = async () => {
     if (!cfToken) {
       toast.error('Please complete the bot verification first');
       return;
     }
-    createUser(cfToken);
+
+    setIsGenerating(true);
+    try {
+      const success = await createUser(cfToken);
+      if (!success) {
+        setCfToken(null);
+        toast.error('Failed to register. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error generating identity:', error);
+      setCfToken(null);
+      toast.error('Failed to register. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const toggleFullscreen = () => {
@@ -258,10 +272,14 @@ const ChatInterface: React.FC = () => {
                 <div className="mb-4">
                   <Turnstile
                     siteKey={import.meta.env.VITE_CLOUDFLARE_SITE_KEY}
-                    onSuccess={(token) => setCfToken(token)}
+                    onSuccess={(token) => {
+                      console.log('Turnstile success, token received');
+                      setCfToken(token);
+                    }}
                     onError={(error) => {
                       console.error('Turnstile error:', error);
                       setCfToken(null);
+                      toast.error('Bot verification failed. Please try again.');
                     }}
                     options={{
                       theme: 'dark',
