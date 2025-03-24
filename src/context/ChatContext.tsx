@@ -39,7 +39,7 @@ interface ChatContextType {
   onlineUsers: number;
   notifications: Notification[];
   sendMessage: (content: string, replyTo?: ChatMessage) => void;
-  createUser: () => Promise<boolean>;
+  createUser: () => void;
   typingUsers: Map<string, { username: string; color: string }>;
   handleInputChange: (content: string) => void;
   isConnected: boolean;
@@ -88,6 +88,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     newSocket.on('connect', () => {
       console.log('Connected to server');
       setIsConnected(true);
+      // Re-register if reconnecting
+      if (currentUser) {
+        newSocket.emit('register', {
+          username: currentUser.username,
+          color: currentUser.color
+        });
+      }
     });
 
     newSocket.on('disconnect', () => {
@@ -116,7 +123,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       newSocket.close();
     };
-  }, []);
+  }, [currentUser, addNotification]);
 
   const validateMessage = (content: string): boolean => {
     if (!content || typeof content !== 'string') return false;
@@ -126,20 +133,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Create user
-  const createUser = useCallback(async () => {
+  const createUser = useCallback(() => {
     if (!socket || !isConnected) {
       toast.error('Waiting for server connection...');
-      return false;
+      return;
     }
 
-    // Only prevent registration if we have a current user
-    if (currentUser) {
-      console.log('User already registered, skipping registration');
-      return true;
-    }
-
-    console.log('Creating new user');
-    const username = `User${Math.floor(Math.random() * 1000)}`;
+    const username = `user_${Math.random().toString(36).substr(2, 6)}`;
     const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
     
     const user: User = {
@@ -148,56 +148,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       color
     };
 
-    return new Promise<boolean>((resolve) => {
-      const handleError = (error: string) => {
-        console.error('Registration error:', error);
-        toast.error(error);
-        socket?.off('error', handleError);
-        socket?.off('registration_success', handleSuccess);
-        resolve(false);
-      };
-
-      const handleSuccess = (data: { username: string; color: string }) => {
-        console.log('Registration success:', data);
-        setCurrentUser(user);
-        toast.success(`Welcome, ${username}!`);
-        socket?.off('error', handleError);
-        socket?.off('registration_success', handleSuccess);
-        resolve(true);
-      };
-
-      // Remove any existing listeners before adding new ones
-      socket.off('error', handleError);
-      socket.off('registration_success', handleSuccess);
-
-      socket.on('error', handleError);
-      socket.on('registration_success', handleSuccess);
-
-      // Generate a simple public key for the user
-      const publicKey = `key_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      console.log('Emitting register event with:', { username: user.username, color: user.color });
-      socket.emit('register', {
-        username: user.username,
-        color: user.color
-      });
-
-      // Add a timeout to prevent hanging
-      const timeout = setTimeout(() => {
-        socket?.off('error', handleError);
-        socket?.off('registration_success', handleSuccess);
-        resolve(false);
-        toast.error('Registration timed out. Please try again.');
-      }, 10000); // 10 second timeout
-
-      // Cleanup function
-      return () => {
-        clearTimeout(timeout);
-        socket?.off('error', handleError);
-        socket?.off('registration_success', handleSuccess);
-      };
+    socket.emit('register', {
+      username: user.username,
+      color: user.color
     });
-  }, [socket, isConnected, currentUser]);
+    
+    setCurrentUser(user);
+    toast.success(`Welcome, ${username}!`);
+  }, [socket, isConnected]);
 
   const sendMessage = useCallback((content: string, replyTo?: ChatMessage) => {
     if (!socket || !currentUser) return;
@@ -230,30 +188,32 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('registration_success', ({ username, color }) => {
-      setCurrentUser({ id: socket.id, username, color });
-      setIsConnected(true);
-    });
-
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
-      toast.error(error);
-    });
-
-    socket.on('chat_message', (message) => {
-      setMessages(prev => [...prev, message]);
-    });
-
-    socket.on('user_joined', (data) => {
-      setOnlineUsers(data.onlineCount);
-    });
-
-    socket.on('user_left', (data) => {
-      setOnlineUsers(prev => Math.max(0, prev - 1));
-    });
-
-    socket.on('online_count', (data) => {
-      setOnlineUsers(data.count);
+    socket.on('chat_message', ({ 
+      id,
+      senderId, 
+      senderUsername,
+      content,
+      timestamp,
+      userColor,
+      replyTo,
+      mentions,
+      isSystem,
+      type
+    }) => {
+      const newMessage: ChatMessage = {
+        id: id || `${senderId}-${timestamp}`,
+        username: senderUsername || 'SYSTEM',
+        content,
+        timestamp: new Date(timestamp),
+        userColor: userColor || '#39ff14',
+        replyTo,
+        mentions,
+        isSystem: isSystem || type === 'system',
+        type
+      };
+      
+      console.log('Received message:', newMessage);
+      setMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
     });
 
     socket.on('mention', ({ username, timestamp }) => {
@@ -268,14 +228,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    socket.on('error', (error) => {
+      toast.error(error);
+    });
+
     return () => {
-      socket.off('registration_success');
-      socket.off('error');
       socket.off('chat_message');
-      socket.off('user_joined');
-      socket.off('user_left');
-      socket.off('online_count');
       socket.off('mention');
+      socket.off('error');
     };
   }, [socket, currentUser, addNotification]);
 
