@@ -290,10 +290,9 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <form
+            <div
               autoComplete="off"
               ref={formRef}
-              onSubmit={handleSendMessage} 
               className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
                 isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
               }`}
@@ -339,7 +338,8 @@ const ChatInterface: React.FC = () => {
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
-                  type="submit" 
+                  type="submit"
+                  onClick={handleSendMessage}
                   className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0"
                   disabled={!messageInput.trim()}
                 >
@@ -347,7 +347,7 @@ const ChatInterface: React.FC = () => {
                   <span className="sr-only">Send</span>
                 </Button>
               </div>
-            </form>
+            </div>
           )}
         </div>
       </div>
