@@ -94,11 +94,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedToken = localStorage.getItem('cfToken');
         if (storedToken) {
           console.log('Re-registering user after reconnection with stored token');
-          newSocket.emit('register', {
-            username: currentUser.username,
-            color: currentUser.color,
-            cfToken: storedToken
-          });
+          // Use a small delay to ensure the socket is ready
+          setTimeout(() => {
+            newSocket.emit('register', {
+              username: currentUser.username,
+              color: currentUser.color,
+              cfToken: storedToken
+            });
+          }, 100);
         } else {
           console.log('No stored token found for re-registration');
           setCurrentUser(null);
@@ -149,6 +152,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
+    // If user is already registered, don't try to register again
+    if (currentUser) {
+      console.log('User already registered, skipping registration');
+      return true;
+    }
+
     console.log('Creating user with cfToken:', token ? 'Token present' : 'No token');
     const username = `User${Math.floor(Math.random() * 1000)}`;
     const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
@@ -177,6 +186,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resolve(true);
       };
 
+      // Remove any existing listeners before adding new ones
+      socket.off('error', handleError);
+      socket.off('registration_success', handleSuccess);
+
       socket.on('error', handleError);
       socket.on('registration_success', handleSuccess);
 
@@ -188,14 +201,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       // Add a timeout to prevent hanging
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         socket?.off('error', handleError);
         socket?.off('registration_success', handleSuccess);
         resolve(false);
         toast.error('Registration timed out. Please try again.');
       }, 10000); // 10 second timeout
+
+      // Cleanup function
+      return () => {
+        clearTimeout(timeout);
+        socket?.off('error', handleError);
+        socket?.off('registration_success', handleSuccess);
+      };
     });
-  }, [socket, isConnected]);
+  }, [socket, isConnected, currentUser]);
 
   const sendMessage = useCallback((content: string, replyTo?: ChatMessage) => {
     if (!socket || !currentUser) return;
