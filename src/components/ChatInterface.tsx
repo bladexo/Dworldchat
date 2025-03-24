@@ -290,7 +290,8 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <form 
+            <form
+              autoComplete="off"
               ref={formRef}
               onSubmit={handleSendMessage} 
               className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
@@ -322,6 +323,7 @@ const ChatInterface: React.FC = () => {
               <div className="flex gap-1 sm:gap-2">
                 <Input
                   ref={inputRef}
+                  name="chat-message-random123"
                   value={messageInput}
                   onChange={handleMessageInput}
                   placeholder="Type your message..."
@@ -329,6 +331,7 @@ const ChatInterface: React.FC = () => {
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck="false"
+                  inputMode="text"
                   data-form-type="other"
                   type="text"
                   role="textbox"
