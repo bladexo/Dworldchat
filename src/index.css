@@ -111,24 +111,31 @@
     @apply bg-black/80 backdrop-blur-lg border border-white/10 rounded-md;
   }
 
-  /* Add mobile-specific styles */
+  /* Mobile styles */
   @media screen and (max-width: 768px) {
     .terminal-window.fullscreen {
-      height: calc(var(--vh, 1vh) * 100) !important;
+      height: 100dvh !important;
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
+      overflow: hidden;
     }
 
     .terminal-body {
-      height: calc(var(--vh, 1vh) * 100 - 3rem) !important;
+      height: 100dvh !important;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Adjust input area when keyboard is active */
-    .terminal-window.fullscreen .terminal-body {
-      padding-bottom: env(safe-area-inset-bottom);
+    /* Handle keyboard active state */
+    .terminal-window:has(input:focus) {
+      height: -webkit-fill-available;
+    }
+
+    .terminal-window:has(input:focus) .terminal-body {
+      height: -webkit-fill-available !important;
     }
   }
 }
