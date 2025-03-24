@@ -22,8 +22,8 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -61,32 +61,28 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Add keyboard detection
+  // Add this effect to handle viewport height changes
   useEffect(() => {
     const handleResize = () => {
       const newHeight = window.innerHeight;
-      if (viewportHeight > newHeight) {
-        // Keyboard is likely shown
-        setKeyboardHeight(viewportHeight - newHeight);
-      } else {
-        // Keyboard is likely hidden
-        setKeyboardHeight(0);
-      }
       setViewportHeight(newHeight);
+      // Detect if keyboard is likely open (threshold can be adjusted)
+      setIsKeyboardOpen(window.innerHeight < viewportHeight * 0.75);
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [viewportHeight]);
 
-  // Handle input focus
+  // Add input focus handler
   const handleInputFocus = () => {
-    if (isMobile && isFullscreen) {
-      // Scroll to input after a short delay to ensure keyboard is shown
-      setTimeout(() => {
-        inputRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+    if (isMobile) {
+      setIsKeyboardOpen(true);
     }
+  };
+
+  const handleInputBlur = () => {
+    setIsKeyboardOpen(false);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -144,18 +140,20 @@ const ChatInterface: React.FC = () => {
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
         ref={chatWindowRef}
-        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
-          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : ''
+        className={`terminal-window fixed inset-0 flex flex-col ${
+          isFullscreen ? 'max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'w-full max-w-4xl min-w-[320px] mx-auto my-0 rounded-lg border border-neon-green/30'
         }`}
-        style={isFullscreen ? { 
-          margin: 0, 
-          padding: 0, 
-          height: '100%',
-          width: '100%',
+        style={{
+          height: isFullscreen ? `${viewportHeight}px` : '80vh',
+          transform: isKeyboardOpen ? `translateY(${window.innerHeight - viewportHeight}px)` : 'none',
+          transition: 'transform 0.2s ease-out',
           position: 'fixed',
-          overflow: 'hidden',
-          transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight}px)` : 'none'
-        } : undefined}
+          bottom: 0,
+          left: 0,
+          right: 0,
+          overscrollBehavior: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
           isFullscreen ? 'border-b border-neon-green/30' : ''
@@ -212,21 +210,22 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden ${
-          isFullscreen && isMobile ? 'h-[100dvh]' : isFullscreen ? 'h-[calc(100vh-40px)]' : 'h-[calc(85vh-3rem)]'
-        }`}
+        <div 
+          className={`terminal-body bg-black flex flex-col flex-1 overflow-hidden`}
           style={{
-            height: isFullscreen && isMobile ? `${viewportHeight}px` : undefined
+            height: isKeyboardOpen ? `${viewportHeight - 60}px` : 'auto',
           }}
         >
           <div className="scan-line-effect pointer-events-none"></div>
           
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2">
-            <MessageList 
-              messages={messages} 
-              onReplyClick={handleReplyClick}
-            />
-          </div> 
+          <div className="flex-1 relative">
+            <div className="absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-none">
+              <MessageList 
+                messages={messages} 
+                onReplyClick={handleReplyClick}
+              />
+            </div>
+          </div>
           
           <div className="flex-shrink-0 mt-1 sm:mt-2">
             {typingUsersList.length > 0 && (
@@ -263,9 +262,7 @@ const ChatInterface: React.FC = () => {
           ) : (
             <form 
               onSubmit={handleSendMessage} 
-              className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-                isFullscreen && isMobile ? 'sticky bottom-0 w-full border-t border-neon-green/30' : ''
-              }`}
+              className={`flex-shrink-0 sticky bottom-0 w-full bg-[#000F00] border-t border-neon-green/30 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 px-1 sm:px-1`}
             >
               {replyingTo && (
                 <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded bg-black/40 border border-neon-green/30">
@@ -293,6 +290,7 @@ const ChatInterface: React.FC = () => {
                   value={messageInput}
                   onChange={handleMessageInput}
                   onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
                   placeholder="Type your message..."
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
