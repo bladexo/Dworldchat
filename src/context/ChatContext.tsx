@@ -60,6 +60,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [onlineUsers, setOnlineUsers] = useState<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [lastMessageTime, setLastMessageTime] = useState<number>(0);
+  const [cfToken, setCfToken] = useState<string | null>(null);
   const MESSAGE_COOLDOWN = 500; // 500ms between messages
   const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; color: string }>>(new Map());
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
@@ -88,12 +89,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     newSocket.on('connect', () => {
       console.log('Connected to server');
       setIsConnected(true);
-      // Re-register if reconnecting
+      // Re-register if reconnecting and we have a current user
       if (currentUser) {
-        newSocket.emit('register', {
-          username: currentUser.username,
-          color: currentUser.color
-        });
+        const storedToken = localStorage.getItem('cfToken');
+        if (storedToken) {
+          console.log('Re-registering user after reconnection with stored token');
+          newSocket.emit('register', {
+            username: currentUser.username,
+            color: currentUser.color,
+            cfToken: storedToken
+          });
+        } else {
+          console.log('No stored token found for re-registration');
+          setCurrentUser(null);
+          toast.error('Session expired. Please verify again.');
+        }
       }
     });
 
@@ -123,7 +133,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       newSocket.close();
     };
-  }, [currentUser, addNotification]);
+  }, [currentUser]);
 
   const validateMessage = (content: string): boolean => {
     if (!content || typeof content !== 'string') return false;
@@ -133,13 +143,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Create user
-  const createUser = useCallback(async (cfToken: string) => {
+  const createUser = useCallback(async (token: string) => {
     if (!socket || !isConnected) {
       toast.error('Waiting for server connection...');
       return false;
     }
 
-    console.log('Creating user with cfToken:', cfToken ? 'Token present' : 'No token');
+    console.log('Creating user with cfToken:', token ? 'Token present' : 'No token');
     const username = `User${Math.floor(Math.random() * 1000)}`;
     const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
     
@@ -170,11 +180,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.on('error', handleError);
       socket.on('registration_success', handleSuccess);
 
-      console.log('Emitting register event with:', { username, color, cfToken: cfToken ? 'Token present' : 'No token' });
+      console.log('Emitting register event with:', { username, color, cfToken: token ? 'Token present' : 'No token' });
       socket.emit('register', {
         username: user.username,
         color: user.color,
-        cfToken
+        cfToken: token
       });
 
       // Add a timeout to prevent hanging
