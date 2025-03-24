@@ -110,11 +110,35 @@
   .glass-panel {
     @apply bg-black/80 backdrop-blur-lg border border-white/10 rounded-md;
   }
+
+  /* Add mobile-specific styles */
+  @media screen and (max-width: 768px) {
+    .terminal-window.fullscreen {
+      height: calc(var(--vh, 1vh) * 100) !important;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    .terminal-body {
+      height: calc(var(--vh, 1vh) * 100 - 3rem) !important;
+    }
+
+    /* Adjust input area when keyboard is active */
+    .terminal-window.fullscreen .terminal-body {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
 }
 
-/* Fullscreen mode overrides */
-body:has(.terminal-window[style*="margin: 0"]) {
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden;
+/* Improve fullscreen mode overrides for mobile */
+@media screen and (max-width: 768px) {
+  body:has(.terminal-window[style*="margin: 0"]) {
+    height: calc(var(--vh, 1vh) * 100);
+    position: fixed;
+    width: 100%;
+    touch-action: pan-y pinch-zoom;
+  }
 }
