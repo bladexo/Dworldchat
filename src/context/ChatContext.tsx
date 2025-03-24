@@ -149,28 +149,58 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return new Promise<boolean>((resolve) => {
+      let isResolved = false;
+
       const handleError = (error: string) => {
+        if (isResolved) return;
+        isResolved = true;
+        console.error('Registration error:', error);
         toast.error(error);
-        socket?.off('error', handleError);
+        cleanup();
         resolve(false);
       };
 
       const handleSuccess = () => {
+        if (isResolved) return;
+        isResolved = true;
         setCurrentUser(user);
         toast.success(`Welcome, ${username}!`);
-        socket?.off('error', handleError);
-        socket?.off('chat_message', handleSuccess);
+        cleanup();
         resolve(true);
       };
 
-      socket.on('error', handleError);
-      socket.on('chat_message', handleSuccess);
+      const cleanup = () => {
+        socket?.off('error', handleError);
+        socket?.off('online_count', checkSuccess);
+        socket?.off('chat_message', checkSuccess);
+      };
 
+      const checkSuccess = () => {
+        // If we receive either online_count or chat_message, consider it a success
+        handleSuccess();
+      };
+
+      // Listen for multiple success indicators
+      socket.on('error', handleError);
+      socket.on('online_count', checkSuccess);
+      socket.on('chat_message', checkSuccess);
+
+      // Emit registration request
       socket.emit('register', {
         username: user.username,
         color: user.color,
         cfToken
       });
+
+      // Add a timeout to prevent hanging
+      setTimeout(() => {
+        if (!isResolved) {
+          isResolved = true;
+          cleanup();
+          toast.error('Registration timed out. Please try again.');
+          resolve(false);
+        }
+      }, 10000); // 10 second timeout
     });
   }, [socket, isConnected]);
 
