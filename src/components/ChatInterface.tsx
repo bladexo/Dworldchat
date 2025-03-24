@@ -22,7 +22,8 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
-  const messageListRef = useRef<HTMLDivElement>(null);
+  const messageContainerRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -60,46 +61,68 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Add viewport height adjustment for mobile keyboard
+  // Enhanced viewport height management
   useEffect(() => {
-    const setVH = () => {
-      const vh = window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    let timeoutId: NodeJS.Timeout;
+    
+    const handleVisualViewportChange = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) return;
+
+      // Clear any pending updates
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // Delay the update slightly to ensure stable values
+      timeoutId = setTimeout(() => {
+        const vh = viewport.height * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+
+        // Adjust form position when keyboard is visible
+        if (formRef.current && isMobile && isFullscreen) {
+          const keyboardHeight = window.innerHeight - viewport.height;
+          if (keyboardHeight > 0) {
+            formRef.current.style.transform = `translateY(-${keyboardHeight}px)`;
+            formRef.current.style.transition = 'transform 0.2s ease-out';
+          } else {
+            formRef.current.style.transform = 'translateY(0)';
+          }
+        }
+
+        // Scroll to bottom when keyboard appears
+        if (messageContainerRef.current) {
+          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+        }
+      }, 100);
     };
 
-    setVH(); // Set initial value
-    window.addEventListener('resize', setVH);
-    window.addEventListener('orientationchange', setVH);
-
-    return () => {
-      window.removeEventListener('resize', setVH);
-      window.removeEventListener('orientationchange', setVH);
-    };
-  }, []);
-
-  // Handle keyboard and focus
-  useEffect(() => {
-    const handleFocus = () => {
-      if (isMobile && inputRef.current) {
-        // Scroll to input when focused
+    // Handle input focus
+    const handleInputFocus = () => {
+      if (isMobile && isFullscreen) {
+        // Delay to ensure keyboard is fully shown
         setTimeout(() => {
-          inputRef.current?.scrollIntoView({ behavior: 'smooth' });
-          // Scroll message list to bottom
-          messageListRef.current?.scrollTo({
-            top: messageListRef.current.scrollHeight,
-            behavior: 'smooth'
-          });
-        }, 100); // Small delay to ensure keyboard is fully shown
+          if (messageContainerRef.current) {
+            messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+          }
+          // Force a viewport update
+          handleVisualViewportChange();
+        }, 300);
       }
     };
 
-    const input = inputRef.current;
-    input?.addEventListener('focus', handleFocus);
-    
+    window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
+    window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
+    inputRef.current?.addEventListener('focus', handleInputFocus);
+
+    // Initial setup
+    handleVisualViewportChange();
+
     return () => {
-      input?.removeEventListener('focus', handleFocus);
+      if (timeoutId) clearTimeout(timeoutId);
+      window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
+      window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
+      inputRef.current?.removeEventListener('focus', handleInputFocus);
     };
-  }, [isMobile]);
+  }, [isMobile, isFullscreen]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,13 +179,14 @@ const ChatInterface: React.FC = () => {
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
         ref={chatWindowRef}
-        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80dvh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
-          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none h-[100dvh] !m-0 !p-0 rounded-none z-[99] border-none' : ''
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none fullscreen' : ''
         }`}
         style={isFullscreen ? { 
           margin: 0, 
-          padding: 0,
-          height: isMobile ? '100dvh' : '100%',
+          padding: 0, 
+          height: isMobile ? 'calc(var(--vh, 1vh) * 100)' : '100%',
+          position: 'fixed',
         } : undefined}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
@@ -220,22 +244,18 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden ${
-          isFullscreen && isMobile ? 'h-[100dvh]' : isFullscreen ? 'h-[calc(100dvh-40px)]' : 'h-[calc(85dvh-3rem)]'
-        }`}>
+        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden`}>
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div 
-            ref={messageListRef}
-            className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 ${
-              isFullscreen && isMobile ? 'h-[calc(100dvh-5rem)]' : ''
-            }`}
+            ref={messageContainerRef}
+            className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
           >
             <MessageList 
               messages={messages} 
               onReplyClick={handleReplyClick}
             />
-          </div> 
+          </div>
           
           <div className="flex-shrink-0 mt-1 sm:mt-2">
             {typingUsersList.length > 0 && (
@@ -271,10 +291,15 @@ const ChatInterface: React.FC = () => {
             </div>
           ) : (
             <form 
+              ref={formRef}
               onSubmit={handleSendMessage} 
               className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-                isFullscreen && isMobile ? 'sticky bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
+                isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
               }`}
+              style={{
+                willChange: 'transform',
+                zIndex: 100
+              }}
             >
               {replyingTo && (
                 <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded bg-black/40 border border-neon-green/30">
@@ -300,6 +325,14 @@ const ChatInterface: React.FC = () => {
                   value={messageInput}
                   onChange={handleMessageInput}
                   placeholder="Type your message..."
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  data-form-type="other"
+                  type="text"
+                  role="textbox"
+                  aria-label="Chat message"
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
