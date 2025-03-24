@@ -139,6 +139,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
+    console.log('Creating user with cfToken:', cfToken ? 'Token present' : 'No token');
     const username = `User${Math.floor(Math.random() * 1000)}`;
     const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
     
@@ -150,23 +151,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return new Promise<boolean>((resolve) => {
       const handleError = (error: string) => {
+        console.error('Registration error:', error);
         toast.error(error);
         socket?.off('error', handleError);
-        socket?.off('online_count', handleSuccess);
+        socket?.off('registration_success', handleSuccess);
         resolve(false);
       };
 
-      const handleSuccess = ({ count }: { count: number }) => {
+      const handleSuccess = (data: { username: string; color: string }) => {
+        console.log('Registration success:', data);
         setCurrentUser(user);
         toast.success(`Welcome, ${username}!`);
         socket?.off('error', handleError);
-        socket?.off('online_count', handleSuccess);
+        socket?.off('registration_success', handleSuccess);
         resolve(true);
       };
 
       socket.on('error', handleError);
-      socket.on('online_count', handleSuccess);
+      socket.on('registration_success', handleSuccess);
 
+      console.log('Emitting register event with:', { username, color, cfToken: cfToken ? 'Token present' : 'No token' });
       socket.emit('register', {
         username: user.username,
         color: user.color,
@@ -176,7 +180,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Add a timeout to prevent hanging
       setTimeout(() => {
         socket?.off('error', handleError);
-        socket?.off('online_count', handleSuccess);
+        socket?.off('registration_success', handleSuccess);
         resolve(false);
         toast.error('Registration timed out. Please try again.');
       }, 10000); // 10 second timeout
