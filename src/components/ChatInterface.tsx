@@ -147,11 +147,21 @@ const ChatInterface: React.FC = () => {
       if (!success) {
         setCfToken(null);
         toast.error('Failed to register. Please try again.');
+        // Reset the Turnstile widget
+        const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
+        if (turnstileElement) {
+          turnstileElement.src = turnstileElement.src;
+        }
       }
     } catch (error) {
       console.error('Error generating identity:', error);
       setCfToken(null);
       toast.error('Failed to register. Please try again.');
+      // Reset the Turnstile widget
+      const turnstileElement = document.querySelector<HTMLIFrameElement>('iframe[src*="challenges.cloudflare.com"]');
+      if (turnstileElement) {
+        turnstileElement.src = turnstileElement.src;
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -275,6 +285,7 @@ const ChatInterface: React.FC = () => {
                     onSuccess={(token) => {
                       console.log('Turnstile success, token received');
                       setCfToken(token);
+                      toast.success('Bot verification successful!');
                     }}
                     onError={(error) => {
                       console.error('Turnstile error:', error);
@@ -297,7 +308,7 @@ const ChatInterface: React.FC = () => {
                   {isGenerating ? (
                     <>
                       <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin text-neon-green animate-pulse" />
-                      <span className="font-mono animate-pulse">Generating Identity...</span>
+                      <span className="font-mono animate-pulse">Verifying Identity...</span>
                     </>
                   ) : (
                     <>
