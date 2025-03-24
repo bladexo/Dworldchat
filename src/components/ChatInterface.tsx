@@ -22,6 +22,7 @@ const ChatInterface: React.FC = () => {
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const messageListRef = useRef<HTMLDivElement>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -75,6 +76,30 @@ const ChatInterface: React.FC = () => {
       window.removeEventListener('orientationchange', setVH);
     };
   }, []);
+
+  // Handle keyboard and focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isMobile && inputRef.current) {
+        // Scroll to input when focused
+        setTimeout(() => {
+          inputRef.current?.scrollIntoView({ behavior: 'smooth' });
+          // Scroll message list to bottom
+          messageListRef.current?.scrollTo({
+            top: messageListRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 100); // Small delay to ensure keyboard is fully shown
+      }
+    };
+
+    const input = inputRef.current;
+    input?.addEventListener('focus', handleFocus);
+    
+    return () => {
+      input?.removeEventListener('focus', handleFocus);
+    };
+  }, [isMobile]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,13 +156,13 @@ const ChatInterface: React.FC = () => {
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
         ref={chatWindowRef}
-        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
-          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : ''
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80dvh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+          isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none h-[100dvh] !m-0 !p-0 rounded-none z-[99] border-none' : ''
         }`}
         style={isFullscreen ? { 
           margin: 0, 
-          padding: 0, 
-          height: isMobile ? 'calc(var(--vh, 1vh) * 100)' : '100%'
+          padding: 0,
+          height: isMobile ? '100dvh' : '100%',
         } : undefined}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
@@ -196,13 +221,16 @@ const ChatInterface: React.FC = () => {
         </div>
         
         <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden ${
-          isFullscreen && isMobile ? 'h-[calc(var(--vh,1vh)*100-3rem)]' : isFullscreen ? 'h-[calc(100vh-40px)]' : 'h-[calc(85vh-3rem)]'
+          isFullscreen && isMobile ? 'h-[100dvh]' : isFullscreen ? 'h-[calc(100dvh-40px)]' : 'h-[calc(85dvh-3rem)]'
         }`}>
           <div className="scan-line-effect pointer-events-none"></div>
           
-          <div className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 ${
-            isFullscreen && isMobile ? 'h-[calc(var(--vh,1vh)*100-8rem)]' : ''
-          }`}>
+          <div 
+            ref={messageListRef}
+            className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2 ${
+              isFullscreen && isMobile ? 'h-[calc(100dvh-5rem)]' : ''
+            }`}
+          >
             <MessageList 
               messages={messages} 
               onReplyClick={handleReplyClick}
@@ -242,9 +270,12 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSendMessage} className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-              isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
-            }`}>
+            <form 
+              onSubmit={handleSendMessage} 
+              className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
+                isFullscreen && isMobile ? 'sticky bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
+              }`}
+            >
               {replyingTo && (
                 <div className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded bg-black/40 border border-neon-green/30">
                   <span className="text-[10px] sm:text-xs text-muted-foreground">Replying to</span>
