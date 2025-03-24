@@ -1,11 +1,10 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ChatMessage, useChat } from '@/context/ChatContext';
 import { formatDistanceToNow } from 'date-fns';
-import { Reply, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { Reply, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 import UsernameBadge from './UsernameBadge';
 import { cn } from '@/lib/utils';
-import ThreadModal from './ThreadModal';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -15,8 +14,6 @@ interface MessageListProps {
 const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useChat();
-  const [showThread, setShowThread] = useState(false);
-  const [activeThread, setActiveThread] = useState<string | null>(null);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
   // Add logging for messages updates
@@ -163,18 +160,6 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
               variant="ghost"
               size="sm"
               className="text-neon-green/70 hover:text-neon-green flex items-center gap-1 px-2 py-1 h-6"
-              onClick={() => {
-                setActiveThread(messageId);
-                setShowThread(true);
-              }}
-            >
-              <MessageSquare className="h-3 w-3" />
-              <span className="text-xs">View Thread</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-neon-green/70 hover:text-neon-green flex items-center gap-1 px-2 py-1 h-6"
               onClick={() => toggleThreadExpansion(messageId)}
             >
               {isExpanded ? (
@@ -217,19 +202,6 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
         {mainMessages.map(message => renderMessage(message))}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Thread Modal - only for non-system messages */}
-      {showThread && activeThread && messages.find(m => m.id === activeThread)?.username && 
-       !messages.find(m => m.id === activeThread)?.username.toLowerCase().includes('system') && (
-        <ThreadModal
-          message={messages.find(m => m.id === activeThread)!}
-          replies={getAllThreadReplies(activeThread, threads)}
-          onClose={() => {
-            setShowThread(false);
-            setActiveThread(null);
-          }}
-        />
-      )}
     </>
   );
 };
