@@ -135,26 +135,12 @@ const ChatInterface: React.FC = () => {
     handleInputChange(newValue);
   };
 
-  const handleCreateUser = async () => {
+  const handleCreateUser = () => {
     if (!cfToken) {
-      toast.error('Please complete the bot check');
+      toast.error('Please complete the bot verification first');
       return;
     }
-
-    setIsGenerating(true);
-    try {
-      const success = await createUser(cfToken);
-      if (!success) {
-        setCfToken(null);
-        toast.error('Failed to register. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error generating identity:', error);
-      setCfToken(null);
-      toast.error('Failed to register. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
+    createUser(cfToken);
   };
 
   const toggleFullscreen = () => {
