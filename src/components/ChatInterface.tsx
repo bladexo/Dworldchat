@@ -74,12 +74,13 @@ const ChatInterface: React.FC = () => {
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
         
-        // Disable scrolling on body when in fullscreen
+        // Disable scrolling on body when in fullscreen, but not on message container
         if (isFullscreen) {
           document.body.style.position = 'fixed';
           document.body.style.width = '100%';
           document.body.style.height = '100%';
           document.body.style.overflow = 'hidden';
+          // Allow touch on message container
           document.body.style.touchAction = 'none';
         }
 
@@ -91,6 +92,7 @@ const ChatInterface: React.FC = () => {
           chatWindowRef.current.style.left = '0';
           chatWindowRef.current.style.right = '0';
           chatWindowRef.current.style.bottom = '0';
+          // Don't block overflow on the chat window
           chatWindowRef.current.style.overflow = 'hidden';
         }
 
@@ -124,12 +126,18 @@ const ChatInterface: React.FC = () => {
             messageContainerRef.current.style.height = `${availableHeight}px`;
             messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
             messageContainerRef.current.style.paddingBottom = `${formHeight}px`;
+            // Enable scrolling on message container
+            messageContainerRef.current.style.overflowY = 'auto';
+            messageContainerRef.current.style.touchAction = 'pan-y';
           } else {
             // Reset when keyboard is hidden
             const availableHeight = window.innerHeight - headerHeight - formHeight;
             messageContainerRef.current.style.height = `${availableHeight}px`;
             messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
             messageContainerRef.current.style.paddingBottom = '0';
+            // Enable scrolling on message container
+            messageContainerRef.current.style.overflowY = 'auto';
+            messageContainerRef.current.style.touchAction = 'pan-y';
           }
           
           // Scroll to bottom - do this only after a delay to ensure layout is stable
@@ -169,9 +177,10 @@ const ChatInterface: React.FC = () => {
       inputRef.current?.addEventListener('focus', handleInputFocus);
       inputRef.current?.addEventListener('blur', handleInputBlur);
       
-      // Prevent default behavior on keyboard events
+      // Allow touch events on message container but prevent them elsewhere
       document.addEventListener('touchmove', (e) => {
-        if (isFullscreen) {
+        // Don't block scrolling inside message container
+        if (isFullscreen && !messageContainerRef.current?.contains(e.target as Node)) {
           e.preventDefault();
         }
       }, { passive: false });
@@ -196,7 +205,7 @@ const ChatInterface: React.FC = () => {
         inputRef.current?.removeEventListener('focus', handleInputFocus);
         inputRef.current?.removeEventListener('blur', handleInputBlur);
         document.removeEventListener('touchmove', (e) => {
-          if (isFullscreen) {
+          if (isFullscreen && !messageContainerRef.current?.contains(e.target as Node)) {
             e.preventDefault();
           }
         });
@@ -389,7 +398,9 @@ const ChatInterface: React.FC = () => {
             style={{
               height: isFullscreen && isMobile ? 'calc(100vh - 108px)' : undefined,
               position: 'relative',
-              zIndex: 10
+              zIndex: 10,
+              overflowY: 'auto',
+              touchAction: 'pan-y'
             }}
           >
             <MessageList 
