@@ -61,66 +61,76 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Enhanced viewport height management
+  // Replace the viewport height management effect with this improved version
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    const originalHeight = window.innerHeight;
     
     const handleVisualViewportChange = () => {
       const viewport = window.visualViewport;
       if (!viewport) return;
 
-      // Clear any pending updates
       if (timeoutId) clearTimeout(timeoutId);
 
-      // Delay the update slightly to ensure stable values
       timeoutId = setTimeout(() => {
-        const vh = viewport.height * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-
-        // Adjust form position when keyboard is visible
         if (formRef.current && isMobile && isFullscreen) {
-          const keyboardHeight = window.innerHeight - viewport.height;
-          if (keyboardHeight > 0) {
-            formRef.current.style.transform = `translateY(-${keyboardHeight}px)`;
-            formRef.current.style.transition = 'transform 0.2s ease-out';
+          const keyboardHeight = originalHeight - viewport.height;
+          const bottomOffset = originalHeight - (viewport.height + viewport.offsetTop);
+          
+          // Only adjust when keyboard is actually shown
+          if (bottomOffset > 0) {
+            formRef.current.style.position = 'fixed';
+            formRef.current.style.bottom = `${bottomOffset}px`;
+            formRef.current.style.left = '0';
+            formRef.current.style.right = '0';
+            formRef.current.style.transition = 'bottom 0.1s ease-out';
+            
+            // Adjust message container to prevent overlap
+            if (messageContainerRef.current) {
+              messageContainerRef.current.style.paddingBottom = `${bottomOffset + 60}px`; // Add extra padding for the input area
+              messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+            }
           } else {
-            formRef.current.style.transform = 'translateY(0)';
+            // Reset when keyboard is hidden
+            formRef.current.style.position = 'fixed';
+            formRef.current.style.bottom = '0';
+            formRef.current.style.transition = 'bottom 0.1s ease-out';
+            
+            if (messageContainerRef.current) {
+              messageContainerRef.current.style.paddingBottom = '60px';
+            }
           }
         }
-
-        // Scroll to bottom when keyboard appears
-        if (messageContainerRef.current) {
-          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-        }
-      }, 100);
+      }, 50);
     };
 
-    // Handle input focus
-    const handleInputFocus = () => {
+    const handleResize = () => {
       if (isMobile && isFullscreen) {
-        // Delay to ensure keyboard is fully shown
-        setTimeout(() => {
-          if (messageContainerRef.current) {
-            messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-          }
-          // Force a viewport update
-          handleVisualViewportChange();
-        }, 300);
+        // Prevent page zoom/bounce
+        document.documentElement.style.height = `${window.innerHeight}px`;
+        document.body.style.height = `${window.innerHeight}px`;
+        document.body.style.overflow = 'hidden';
       }
     };
 
     window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
     window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-    inputRef.current?.addEventListener('focus', handleInputFocus);
+    window.addEventListener('resize', handleResize);
 
     // Initial setup
+    handleResize();
     handleVisualViewportChange();
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
       window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
-      inputRef.current?.removeEventListener('focus', handleInputFocus);
+      window.removeEventListener('resize', handleResize);
+      
+      // Reset styles
+      document.documentElement.style.height = '';
+      document.body.style.height = '';
+      document.body.style.overflow = '';
     };
   }, [isMobile, isFullscreen]);
 
@@ -185,8 +195,12 @@ const ChatInterface: React.FC = () => {
         style={isFullscreen ? { 
           margin: 0, 
           padding: 0, 
-          height: isMobile ? 'calc(var(--vh, 1vh) * 100)' : '100%',
+          height: '100%',
           position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0
         } : undefined}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
@@ -294,11 +308,13 @@ const ChatInterface: React.FC = () => {
               ref={formRef}
               onSubmit={handleSendMessage} 
               className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-                isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
+                isFullscreen && isMobile ? 'fixed left-0 right-0 border-t border-neon-green/30' : ''
               }`}
               style={{
-                willChange: 'transform',
-                zIndex: 100
+                position: isFullscreen && isMobile ? 'fixed' : 'relative',
+                bottom: 0,
+                zIndex: 100,
+                transition: 'bottom 0.1s ease-out'
               }}
             >
               {replyingTo && (
