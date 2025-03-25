@@ -22,8 +22,20 @@ export const useFullscreen = () => {
 
   const toggleFullscreen = useCallback(() => {
     if (isIOS) {
-      // For iOS, just toggle the state
+      // For iOS, we'll use our custom fullscreen mode
       setIsFullscreen(!isFullscreen);
+      // Apply iOS-specific body styles
+      if (!isFullscreen) {
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        document.body.style.overflow = '';
+      }
     } else {
       // For other devices, use the Fullscreen API
       if (!document.fullscreenElement) {
@@ -38,5 +50,5 @@ export const useFullscreen = () => {
     }
   }, [isFullscreen]);
 
-  return { isFullscreen, toggleFullscreen };
+  return { isFullscreen, toggleFullscreen, isIOS };
 }; 
