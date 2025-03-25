@@ -77,30 +77,20 @@ const ChatInterface: React.FC = () => {
         const vh = viewport.height * 0.01;
         document.documentElement.style.setProperty('--vh', `${vh}px`);
 
-        if (isMobile) {
+        // Adjust form position when keyboard is visible
+        if (formRef.current && isMobile && isFullscreen) {
           const keyboardHeight = window.innerHeight - viewport.height;
-          const isKeyboardVisible = keyboardHeight > 0;
-
-          if (chatWindowRef.current) {
-            if (isFullscreen) {
-              // Fullscreen mode handling
-              chatWindowRef.current.style.height = `calc(var(--vh, 1vh) * 100)`;
-              if (formRef.current) {
-                formRef.current.style.transform = isKeyboardVisible ? 
-                  `translateY(-${keyboardHeight}px)` : 'translateY(0)';
-              }
-            } else {
-              // Regular mode handling
-              chatWindowRef.current.style.height = isKeyboardVisible ? 
-                `${viewport.height * 0.9}px` : '80vh';
-              chatWindowRef.current.style.minHeight = '350px';
-            }
+          if (keyboardHeight > 0) {
+            formRef.current.style.transform = `translateY(-${keyboardHeight}px)`;
+            formRef.current.style.transition = 'transform 0.2s ease-out';
+          } else {
+            formRef.current.style.transform = 'translateY(0)';
           }
+        }
 
-          // Scroll to bottom when keyboard appears
-          if (messageContainerRef.current) {
-            messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-          }
+        // Scroll to bottom when keyboard appears
+        if (messageContainerRef.current) {
+          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
         }
       }, 100);
     };
@@ -189,18 +179,15 @@ const ChatInterface: React.FC = () => {
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
         ref={chatWindowRef}
-        className={`terminal-window w-full max-w-4xl min-w-[320px] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
           isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none fullscreen' : ''
         }`}
-        style={{
-          height: isFullscreen ? 'calc(var(--vh, 1vh) * 100)' : '80vh',
-          minHeight: '350px',
-          ...(isFullscreen ? { 
-            margin: 0, 
-            padding: 0,
-            position: 'fixed',
-          } : undefined)
-        }}
+        style={isFullscreen ? { 
+          margin: 0, 
+          padding: 0, 
+          height: isMobile ? 'calc(var(--vh, 1vh) * 100)' : '100%',
+          position: 'fixed',
+        } : undefined}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
           isFullscreen ? 'border-b border-neon-green/30' : ''
