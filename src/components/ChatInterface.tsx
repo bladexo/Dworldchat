@@ -61,6 +61,13 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
+  // Add message container scroll handler
+  useEffect(() => {
+    if (messageContainerRef.current && messages.length > 0) {
+      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   // Enhanced viewport height management
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -101,15 +108,17 @@ const ChatInterface: React.FC = () => {
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
+          messageContainerRef.current.style.WebkitOverflowScrolling = 'touch';
         }
 
         if (formRef.current) {
-          formRef.current.style.position = 'relative';
+          formRef.current.style.position = 'fixed';
           formRef.current.style.bottom = keyboardHeight > 0 ? `${keyboardHeight}px` : '0';
           formRef.current.style.left = '0';
           formRef.current.style.right = '0';
           formRef.current.style.backgroundColor = '#000F00';
           formRef.current.style.transition = 'none';
+          formRef.current.style.zIndex = '50';
         }
       }, 50);
     };
