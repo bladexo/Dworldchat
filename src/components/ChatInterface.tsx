@@ -234,7 +234,7 @@ const ChatInterface: React.FC = () => {
           margin: 0,
           padding: 0,
           overflow: 'hidden',
-          WebkitOverflowScrolling: 'touch'
+          touchAction: 'none'
         } : {
           position: 'relative',
           overflow: 'hidden'
@@ -302,13 +302,15 @@ const ChatInterface: React.FC = () => {
             ref={messageContainerRef}
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
-              position: 'relative',
-              zIndex: 1,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: isFullscreen ? '56px' : '60px',
               overflowY: 'auto',
               overscrollBehavior: 'contain',
-              WebkitOverflowScrolling: 'touch',
-              height: isFullscreen ? 'calc(100dvh - 108px)' : 'calc(100% - 60px)',
-              paddingBottom: isFullscreen ? '0' : '60px'
+              touchAction: 'pan-y',
+              zIndex: 1
             }}
           >
             <MessageList 
