@@ -83,12 +83,16 @@ const ChatInterface: React.FC = () => {
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
         
-        // Lock the body in place for both iOS and Android
+        // Lock everything in place
+        document.documentElement.style.position = 'fixed';
+        document.documentElement.style.width = '100%';
+        document.documentElement.style.height = '100%';
+        document.documentElement.style.overflow = 'hidden';
+        
         document.body.style.position = 'fixed';
         document.body.style.width = '100%';
-        document.body.style.height = `${window.innerHeight}px`;
+        document.body.style.height = '100%';
         document.body.style.overflow = 'hidden';
-        document.body.style.overscrollBehavior = 'none';
         document.body.style.top = '0';
         document.body.style.left = '0';
 
@@ -98,11 +102,13 @@ const ChatInterface: React.FC = () => {
             top: '0',
             left: '0',
             right: '0',
-            bottom: '0',
-            height: `${window.innerHeight}px`,
+            width: '100%',
+            height: '100%',
             overflow: 'hidden',
             transform: 'translate3d(0, 0, 0)',
-            WebkitTransform: 'translate3d(0, 0, 0)'
+            WebkitTransform: 'translate3d(0, 0, 0)',
+            margin: '0',
+            padding: '0'
           });
         }
 
@@ -115,12 +121,21 @@ const ChatInterface: React.FC = () => {
             height: `${availableHeight}px`,
             maxHeight: `${availableHeight}px`,
             overflowY: 'auto',
-            position: 'relative',
+            position: 'absolute',
+            top: `${headerHeight}px`,
+            left: '0',
+            right: '0',
+            bottom: `${inputHeight}px`,
             overscrollBehavior: 'contain',
             WebkitOverflowScrolling: 'touch',
             transform: 'translate3d(0, 0, 0)',
-            WebkitTransform: 'translate3d(0, 0, 0)'
+            WebkitTransform: 'translate3d(0, 0, 0)',
+            margin: '0',
+            padding: '0'
           });
+
+          // Ensure scroll to bottom
+          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
         }
 
         if (formRef.current) {
@@ -132,12 +147,14 @@ const ChatInterface: React.FC = () => {
             backgroundColor: '#000F00',
             transition: 'none',
             zIndex: '50',
-            paddingBottom: isIOS ? 'env(safe-area-inset-bottom)' : '0',
             transform: 'translate3d(0, 0, 0)',
-            WebkitTransform: 'translate3d(0, 0, 0)'
+            WebkitTransform: 'translate3d(0, 0, 0)',
+            margin: '0',
+            padding: '8px',
+            paddingBottom: isIOS ? `calc(8px + env(safe-area-inset-bottom))` : '8px'
           });
         }
-      }, 16); // Reduced timeout for smoother updates
+      }, 16);
     };
 
     if (isMobile && isFullscreen) {
@@ -148,22 +165,26 @@ const ChatInterface: React.FC = () => {
       window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
       window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
       
-      // Prevent scrolling on the body
-      document.body.addEventListener('touchmove', (e) => {
-        if (e.target === document.body) {
+      // Prevent any scrolling on body and html
+      const preventScroll = (e: TouchEvent) => {
+        if (e.target === document.body || e.target === document.documentElement) {
           e.preventDefault();
         }
-      }, { passive: false });
+      };
+      
+      document.body.addEventListener('touchmove', preventScroll, { passive: false });
+      document.documentElement.addEventListener('touchmove', preventScroll, { passive: false });
       
       return () => {
         if (timeoutId) clearTimeout(timeoutId);
         window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
         window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
-        document.body.removeEventListener('touchmove', (e) => {
-          if (e.target === document.body) {
-            e.preventDefault();
-          }
-        });
+        document.body.removeEventListener('touchmove', preventScroll);
+        document.documentElement.removeEventListener('touchmove', preventScroll);
+        
+        // Reset styles
+        document.documentElement.style.cssText = '';
+        document.body.style.cssText = '';
       };
     }
     
