@@ -156,6 +156,8 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.bottom = '';
         chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.overflow = '';
+        chatWindowRef.current.style.margin = '';
+        chatWindowRef.current.style.padding = '';
       }
       
       if (messageContainerRef.current) {
@@ -164,6 +166,7 @@ const ChatInterface: React.FC = () => {
         messageContainerRef.current.style.overflowY = '';
         messageContainerRef.current.style.position = '';
         messageContainerRef.current.style.overscrollBehavior = '';
+        messageContainerRef.current.style.paddingBottom = '';
       }
 
       if (formRef.current) {
@@ -173,6 +176,10 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.right = '';
         formRef.current.style.backgroundColor = '';
         formRef.current.style.transition = '';
+        formRef.current.style.zIndex = '';
+        formRef.current.style.paddingBottom = '';
+        formRef.current.style.margin = '';
+        formRef.current.style.transform = '';
       }
     }
   }, [isFullscreen]);
@@ -369,7 +376,7 @@ const ChatInterface: React.FC = () => {
               ref={formRef}
               onSubmit={handleSendMessage} 
               className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
-                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0'
+                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'sticky bottom-0 left-0 right-0'
               }`}
               style={{
                 backgroundColor: '#000F00',
@@ -380,8 +387,9 @@ const ChatInterface: React.FC = () => {
                     ? `${window.innerHeight - window.visualViewport.height}px` 
                     : '0'
                 } : {
-                  position: 'absolute',
-                  bottom: 0
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 10
                 })
               }}
             >
