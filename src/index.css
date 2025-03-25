@@ -112,31 +112,44 @@
     @apply bg-black/80 backdrop-blur-lg border border-white/10 rounded-md;
   }
 
-  /* Mobile styles */
+  /* Add mobile-specific styles */
   @media screen and (max-width: 768px) {
     .terminal-window.fullscreen {
-      height: 100dvh !important;
+      height: 100vh !important;
+      height: -webkit-fill-available !important;
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }
 
     .terminal-body {
-      height: 100dvh !important;
-      display: flex;
-      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      height: auto !important;
     }
 
-    /* Handle keyboard active state */
-    .terminal-window:has(input:focus) {
-      height: -webkit-fill-available;
+    .terminal-body .message-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
 
-    .terminal-window:has(input:focus) .terminal-body {
-      height: -webkit-fill-available !important;
+    .terminal-body .input-form {
+      position: relative;
+      background: #000F00;
+      border-top: 1px solid rgba(57, 255, 20, 0.3);
+      z-index: 10;
     }
   }
 }
@@ -144,9 +157,11 @@
 /* Improve fullscreen mode overrides for mobile */
 @media screen and (max-width: 768px) {
   body:has(.terminal-window[style*="margin: 0"]) {
-    height: calc(var(--vh, 1vh) * 100);
+    height: 100vh;
+    height: -webkit-fill-available;
     position: fixed;
     width: 100%;
-    touch-action: pan-y pinch-zoom;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 }
