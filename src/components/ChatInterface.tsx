@@ -83,7 +83,7 @@ const ChatInterface: React.FC = () => {
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
         
-        // Lock the body in place
+        // Lock the body in place for both iOS and Android
         document.body.style.position = 'fixed';
         document.body.style.width = '100%';
         document.body.style.height = '100%';
@@ -96,7 +96,7 @@ const ChatInterface: React.FC = () => {
           chatWindowRef.current.style.left = '0';
           chatWindowRef.current.style.right = '0';
           chatWindowRef.current.style.bottom = '0';
-          chatWindowRef.current.style.height = isIOS ? `${viewport.height}px` : '100%';
+          chatWindowRef.current.style.height = '100%';
           chatWindowRef.current.style.overflow = 'hidden';
         }
 
@@ -110,6 +110,7 @@ const ChatInterface: React.FC = () => {
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
+          (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = 'touch';
         }
 
         if (formRef.current) {
@@ -255,7 +256,7 @@ const ChatInterface: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          height: '100dvh',
+          height: '100%',
           margin: 0,
           padding: 0,
           overflow: 'hidden',
