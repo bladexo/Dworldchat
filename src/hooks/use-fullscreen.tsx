@@ -6,20 +6,6 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 
 export const useFullscreen = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isIOSKeyboardVisible, setIsIOSKeyboardVisible] = useState(false);
-
-  // Handle iOS keyboard visibility
-  useEffect(() => {
-    if (isIOS && isFullscreen) {
-      const handleResize = () => {
-        const keyboardHeight = window.innerHeight - window.visualViewport?.height;
-        setIsIOSKeyboardVisible(keyboardHeight > 100);
-      };
-
-      window.visualViewport?.addEventListener('resize', handleResize);
-      return () => window.visualViewport?.removeEventListener('resize', handleResize);
-    }
-  }, [isFullscreen]);
 
   const handleFullscreenChange = useCallback(() => {
     if (!isIOS) {
@@ -52,5 +38,5 @@ export const useFullscreen = () => {
     }
   }, [isFullscreen]);
 
-  return { isFullscreen, toggleFullscreen, isIOS, isIOSKeyboardVisible };
+  return { isFullscreen, toggleFullscreen };
 }; 
