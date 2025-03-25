@@ -80,7 +80,6 @@ const ChatInterface: React.FC = () => {
           document.body.style.width = '100%';
           document.body.style.height = '100%';
           document.body.style.overflow = 'hidden';
-          document.body.style.touchAction = 'none';
           document.body.style.overscrollBehavior = 'none';
         }
 
@@ -92,57 +91,27 @@ const ChatInterface: React.FC = () => {
           chatWindowRef.current.style.right = '0';
           chatWindowRef.current.style.bottom = '0';
           chatWindowRef.current.style.overflow = 'hidden';
-          chatWindowRef.current.style.overscrollBehavior = 'none';
-        }
-
-        if (formRef.current) {
-          if (keyboardHeight > 0) {
-            // Only adjust the form position, don't affect other elements
-            formRef.current.style.position = 'fixed';
-            formRef.current.style.bottom = `${keyboardHeight}px`;
-            formRef.current.style.left = '0';
-            formRef.current.style.right = '0';
-            formRef.current.style.transition = 'bottom 0.2s ease-out';
-            formRef.current.style.zIndex = '100';
-            formRef.current.style.backgroundColor = '#000F00';
-          } else {
-            formRef.current.style.position = 'fixed';
-            formRef.current.style.bottom = '0';
-            formRef.current.style.left = '0';
-            formRef.current.style.right = '0';
-            formRef.current.style.zIndex = '100';
-            formRef.current.style.backgroundColor = '#000F00';
-          }
         }
 
         if (messageContainerRef.current) {
-          // Keep message container height fixed
-          messageContainerRef.current.style.height = `${window.innerHeight - 108}px`;
-          messageContainerRef.current.style.maxHeight = `${window.innerHeight - 108}px`;
+          messageContainerRef.current.style.height = `${viewport.height - 108}px`;
+          messageContainerRef.current.style.maxHeight = `${viewport.height - 108}px`;
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.zIndex = '10';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
         }
-      }, 100);
-    };
 
-    // Handle form submission
-    const handleFormSubmit = () => {
-      if (isMobile && isFullscreen) {
-        // Prevent any scrolling or layout shifts when sending
+        // Scroll to bottom after keyboard appears/disappears
         if (messageContainerRef.current) {
           messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
         }
-      }
+      }, 100);
     };
 
     if (isMobile && isFullscreen) {
       window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
       window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-      
-      // Additional event listeners for form and input
-      formRef.current?.addEventListener('submit', handleFormSubmit);
       
       // Initial setup
       handleVisualViewportChange();
@@ -153,7 +122,6 @@ const ChatInterface: React.FC = () => {
         document.body.style.width = '';
         document.body.style.height = '';
         document.body.style.overflow = '';
-        document.body.style.touchAction = '';
         document.body.style.overscrollBehavior = '';
       };
       
@@ -161,7 +129,6 @@ const ChatInterface: React.FC = () => {
         if (timeoutId) clearTimeout(timeoutId);
         window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
         window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
-        formRef.current?.removeEventListener('submit', handleFormSubmit);
         cleanup();
       };
     }
@@ -177,7 +144,6 @@ const ChatInterface: React.FC = () => {
       document.body.style.width = '';
       document.body.style.height = '';
       document.body.style.overflow = '';
-      document.body.style.touchAction = '';
       document.body.style.overscrollBehavior = '';
       
       // Reset container styles
@@ -185,7 +151,6 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.position = '';
         chatWindowRef.current.style.overflow = '';
-        chatWindowRef.current.style.overscrollBehavior = '';
       }
       
       // Reset message container
@@ -193,15 +158,6 @@ const ChatInterface: React.FC = () => {
         messageContainerRef.current.style.height = '';
         messageContainerRef.current.style.maxHeight = '';
         messageContainerRef.current.style.overscrollBehavior = '';
-      }
-      
-      // Reset form
-      if (formRef.current) {
-        formRef.current.style.position = '';
-        formRef.current.style.bottom = '';
-        formRef.current.style.left = '';
-        formRef.current.style.right = '';
-        formRef.current.style.backgroundColor = '';
       }
     }
   }, [isFullscreen]);
@@ -345,13 +301,12 @@ const ChatInterface: React.FC = () => {
           
           <div 
             ref={messageContainerRef}
-            className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
+            className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
-              height: isFullscreen && isMobile ? 'calc(100vh - 108px)' : undefined,
               position: 'relative',
               zIndex: 10,
               overflowY: 'auto',
-              touchAction: 'pan-y'
+              overscrollBehavior: 'contain'
             }}
           >
             <MessageList 
@@ -396,14 +351,9 @@ const ChatInterface: React.FC = () => {
             <form 
               ref={formRef}
               onSubmit={handleSendMessage} 
-              className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-                isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
-              }`}
+              className="input-form flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1"
               style={{
-                position: isFullscreen && isMobile ? 'fixed' : undefined,
-                bottom: 0,
-                left: 0,
-                right: 0,
+                position: 'relative',
                 zIndex: 100,
                 backgroundColor: '#000F00',
               }}
