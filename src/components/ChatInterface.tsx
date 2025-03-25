@@ -21,9 +21,10 @@ const ChatInterface: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
-  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const { isFullscreen, toggleFullscreen, isIOS, isIOSKeyboardVisible } = useFullscreen();
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -98,17 +99,31 @@ const ChatInterface: React.FC = () => {
           chatWindowRef.current.style.overflow = 'hidden';
         }
 
+        if (headerRef.current && isIOS) {
+          headerRef.current.style.position = 'fixed';
+          headerRef.current.style.top = '0';
+          headerRef.current.style.left = '0';
+          headerRef.current.style.right = '0';
+          headerRef.current.style.zIndex = '100';
+        }
+
         if (messageContainerRef.current) {
           const headerHeight = 48;
           const inputHeight = 56;
           const availableHeight = viewport.height - headerHeight - inputHeight;
           
-          messageContainerRef.current.style.height = `${availableHeight}px`;
-          messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
+          if (isIOS) {
+            messageContainerRef.current.style.marginTop = '48px';
+            messageContainerRef.current.style.height = `${availableHeight}px`;
+            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
+          } else {
+            messageContainerRef.current.style.height = `${availableHeight}px`;
+            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
+          }
+          
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
-          messageContainerRef.current.style.paddingBottom = keyboardHeight > 0 ? '8px' : '4px';
         }
 
         if (formRef.current) {
@@ -137,7 +152,7 @@ const ChatInterface: React.FC = () => {
     }
     
     return undefined;
-  }, [isMobile, isFullscreen]);
+  }, [isMobile, isFullscreen, isIOS]);
 
   // Thorough cleanup when fullscreen changes
   useEffect(() => {
@@ -265,13 +280,18 @@ const ChatInterface: React.FC = () => {
         }}
       >
         <div 
+          ref={headerRef}
           className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-            isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-[100]' : ''
+            isFullscreen ? 'border-b border-neon-green/30' : ''
           }`}
-          style={isFullscreen ? {
+          style={isIOS && isFullscreen ? {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 100,
             backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)'
+            backdropFilter: 'blur(10px)'
           } : undefined}
         >
           <div className="flex items-center">
@@ -326,9 +346,7 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative ${
-          isFullscreen ? 'mt-[48px]' : ''
-        }`}>
+        <div className="terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative">
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div 
@@ -341,7 +359,10 @@ const ChatInterface: React.FC = () => {
               overscrollBehavior: 'contain',
               WebkitOverflowScrolling: 'touch',
               height: isFullscreen ? 'calc(100dvh - 108px)' : 'calc(100% - 60px)',
-              paddingBottom: isFullscreen ? '0' : '60px'
+              paddingBottom: isFullscreen ? '0' : '60px',
+              ...(isIOS && isFullscreen && {
+                marginTop: '48px'
+              })
             }}
           >
             <MessageList 
