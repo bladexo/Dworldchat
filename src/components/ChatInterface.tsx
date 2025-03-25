@@ -61,60 +61,61 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Enhanced viewport height management
+  // Modify the viewport height management to only handle non-fullscreen mode
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
     const handleVisualViewportChange = () => {
       const viewport = window.visualViewport;
-      if (!viewport) return;
+      if (!viewport || isFullscreen) return; // Skip if in fullscreen
 
       // Clear any pending updates
       if (timeoutId) clearTimeout(timeoutId);
 
       // Delay the update slightly to ensure stable values
       timeoutId = setTimeout(() => {
-        const vh = viewport.height * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-
-        // Adjust form position when keyboard is visible
-        if (formRef.current && isMobile && isFullscreen) {
-          const keyboardHeight = window.innerHeight - viewport.height;
-          if (keyboardHeight > 0) {
-            formRef.current.style.transform = `translateY(-${keyboardHeight}px)`;
-            formRef.current.style.transition = 'transform 0.2s ease-out';
-          } else {
-            formRef.current.style.transform = 'translateY(0)';
+        if (isMobile && !isFullscreen) {
+          // Only adjust the chat interface height in non-fullscreen mode
+          if (messageContainerRef.current && formRef.current) {
+            const keyboardHeight = window.innerHeight - viewport.height;
+            if (keyboardHeight > 0) {
+              // Adjust the container height to account for keyboard
+              messageContainerRef.current.style.height = `calc(${viewport.height}px - 8rem)`;
+              formRef.current.style.position = 'fixed';
+              formRef.current.style.bottom = '0';
+              formRef.current.style.left = '0';
+              formRef.current.style.right = '0';
+              formRef.current.style.backgroundColor = '#000F00';
+            } else {
+              // Reset styles when keyboard is hidden
+              messageContainerRef.current.style.height = '';
+              formRef.current.style.position = '';
+              formRef.current.style.bottom = '';
+              formRef.current.style.left = '';
+              formRef.current.style.right = '';
+            }
           }
-        }
-
-        // Scroll to bottom when keyboard appears
-        if (messageContainerRef.current) {
-          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
         }
       }, 100);
     };
 
-    // Handle input focus
+    // Handle input focus for non-fullscreen mode
     const handleInputFocus = () => {
-      if (isMobile && isFullscreen) {
-        // Delay to ensure keyboard is fully shown
+      if (isMobile && !isFullscreen) {
         setTimeout(() => {
           if (messageContainerRef.current) {
             messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
           }
-          // Force a viewport update
           handleVisualViewportChange();
         }, 300);
       }
     };
 
-    window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
-    window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-    inputRef.current?.addEventListener('focus', handleInputFocus);
-
-    // Initial setup
-    handleVisualViewportChange();
+    if (!isFullscreen) {
+      window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
+      inputRef.current?.addEventListener('focus', handleInputFocus);
+    }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -290,9 +291,9 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div
-              autoComplete="off"
+            <form 
               ref={formRef}
+              onSubmit={handleSendMessage} 
               className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
                 isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
               }`}
@@ -322,7 +323,6 @@ const ChatInterface: React.FC = () => {
               <div className="flex gap-1 sm:gap-2">
                 <Input
                   ref={inputRef}
-                  name="chat-message-random123"
                   value={messageInput}
                   onChange={handleMessageInput}
                   placeholder="Type your message..."
@@ -330,7 +330,6 @@ const ChatInterface: React.FC = () => {
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck="false"
-                  inputMode="text"
                   data-form-type="other"
                   type="text"
                   role="textbox"
@@ -338,8 +337,7 @@ const ChatInterface: React.FC = () => {
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
-                  type="submit"
-                  onClick={handleSendMessage}
+                  type="submit" 
                   className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0"
                   disabled={!messageInput.trim()}
                 >
@@ -347,7 +345,7 @@ const ChatInterface: React.FC = () => {
                   <span className="sr-only">Send</span>
                 </Button>
               </div>
-            </div>
+            </form>
           )}
         </div>
       </div>
