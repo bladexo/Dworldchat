@@ -108,7 +108,6 @@ const ChatInterface: React.FC = () => {
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
-          messageContainerRef.current.style.WebkitOverflowScrolling = 'touch';
         }
 
         if (formRef.current) {
@@ -119,6 +118,7 @@ const ChatInterface: React.FC = () => {
           formRef.current.style.backgroundColor = '#000F00';
           formRef.current.style.transition = 'none';
           formRef.current.style.zIndex = '50';
+          formRef.current.style.paddingBottom = keyboardHeight > 0 ? '8px' : '4px';
         }
       }, 50);
     };
@@ -319,9 +319,11 @@ const ChatInterface: React.FC = () => {
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
               position: 'relative',
-              zIndex: 10,
+              zIndex: 1,
               overflowY: 'auto',
-              overscrollBehavior: 'contain'
+              overscrollBehavior: 'contain',
+              height: isFullscreen ? undefined : 'calc(100% - 60px)',
+              paddingBottom: isFullscreen ? '0' : '60px'
             }}
           >
             <MessageList 
@@ -330,7 +332,7 @@ const ChatInterface: React.FC = () => {
             />
           </div>
           
-          <div className="flex-shrink-0 mt-1 sm:mt-2">
+          <div className="flex-shrink-0">
             {typingUsersList.length > 0 && (
               <TypingIndicator users={typingUsersList} />
             )}
@@ -366,11 +368,21 @@ const ChatInterface: React.FC = () => {
             <form 
               ref={formRef}
               onSubmit={handleSendMessage} 
-              className="input-form flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1"
+              className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
+                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0'
+              }`}
               style={{
-                position: 'relative',
-                zIndex: 100,
                 backgroundColor: '#000F00',
+                boxShadow: '0 -2px 10px rgba(0,0,0,0.3)',
+                ...(isFullscreen ? {
+                  position: 'fixed',
+                  bottom: window.visualViewport?.height 
+                    ? `${window.innerHeight - window.visualViewport.height}px` 
+                    : '0'
+                } : {
+                  position: 'absolute',
+                  bottom: 0
+                })
               }}
             >
               {replyingTo && (
