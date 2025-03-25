@@ -164,32 +164,51 @@ const ChatInterface: React.FC = () => {
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault(); // Prevent default Enter behavior
-      e.stopPropagation(); // Stop event propagation
+      e.preventDefault();
       handleSendMessage(e as unknown as React.FormEvent);
     }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    e.stopPropagation(); // Add this to ensure no propagation
     
     if (messageInput.trim()) {
+      // Keep focus on input to prevent keyboard from closing
       if (isMobile && isFullscreen) {
-        // Keep focus on input to prevent keyboard from closing
-        inputRef.current?.focus();
-      }
-      
-      await sendMessage(messageInput, replyingTo);
-      if (soundEnabled) {
-        soundManager.playMessageSound();
-      }
-      setMessageInput('');
-      setReplyingTo(null);
-      
-      // Scroll to bottom after sending
-      if (messageContainerRef.current) {
-        messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+        // Prevent any default behaviors
+        e.stopPropagation();
+        e.nativeEvent?.stopImmediatePropagation?.();
+        
+        // Keep keyboard up by maintaining focus
+        const currentInput = inputRef.current;
+        await sendMessage(messageInput, replyingTo);
+        currentInput?.focus();
+        
+        if (soundEnabled) {
+          soundManager.playMessageSound();
+        }
+        setMessageInput('');
+        setReplyingTo(null);
+        
+        // Smooth scroll to bottom
+        if (messageContainerRef.current) {
+          messageContainerRef.current.scrollTo({
+            top: messageContainerRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      } else {
+        // Non-mobile behavior
+        await sendMessage(messageInput, replyingTo);
+        if (soundEnabled) {
+          soundManager.playMessageSound();
+        }
+        setMessageInput('');
+        setReplyingTo(null);
+        
+        if (messageContainerRef.current) {
+          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+        }
       }
     }
   };
