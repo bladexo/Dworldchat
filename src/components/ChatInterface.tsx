@@ -108,6 +108,7 @@ const ChatInterface: React.FC = () => {
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
+          messageContainerRef.current.style.paddingBottom = keyboardHeight > 0 ? '8px' : '4px';
         }
 
         if (formRef.current) {
@@ -253,18 +254,26 @@ const ChatInterface: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          height: '100%',
+          height: '100dvh',
           margin: 0,
           padding: 0,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          WebkitOverflowScrolling: 'touch'
         } : {
           position: 'relative',
           overflow: 'hidden'
         }}
       >
-        <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-          isFullscreen ? 'border-b border-neon-green/30' : ''
-        }`}>
+        <div 
+          className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
+            isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-[100]' : ''
+          }`}
+          style={isFullscreen ? {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)'
+          } : undefined}
+        >
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
             <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -317,7 +326,9 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className="terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative">
+        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative ${
+          isFullscreen ? 'mt-[48px]' : ''
+        }`}>
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div 
@@ -328,7 +339,8 @@ const ChatInterface: React.FC = () => {
               zIndex: 1,
               overflowY: 'auto',
               overscrollBehavior: 'contain',
-              height: isFullscreen ? undefined : 'calc(100% - 60px)',
+              WebkitOverflowScrolling: 'touch',
+              height: isFullscreen ? 'calc(100dvh - 108px)' : 'calc(100% - 60px)',
               paddingBottom: isFullscreen ? '0' : '60px'
             }}
           >
@@ -337,9 +349,7 @@ const ChatInterface: React.FC = () => {
               onReplyClick={handleReplyClick}
             />
             {typingUsersList.length > 0 && (
-              <div className="px-2 py-1">
-                <TypingIndicator users={typingUsersList} />
-              </div>
+              <TypingIndicator users={typingUsersList} />
             )}
           </div>
           
@@ -383,7 +393,8 @@ const ChatInterface: React.FC = () => {
                   position: 'fixed',
                   bottom: window.visualViewport?.height 
                     ? `${window.innerHeight - window.visualViewport.height}px` 
-                    : '0'
+                    : '0',
+                  paddingBottom: 'env(safe-area-inset-bottom)'
                 } : {
                   position: 'absolute',
                   bottom: 0
