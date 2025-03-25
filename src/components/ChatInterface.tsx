@@ -93,8 +93,19 @@ const ChatInterface: React.FC = () => {
           chatWindowRef.current.style.overflow = 'hidden';
         }
 
+        if (formRef.current) {
+          // Keep form fixed at keyboard height
+          formRef.current.style.position = 'fixed';
+          formRef.current.style.bottom = keyboardHeight > 0 ? `${keyboardHeight}px` : '0';
+          formRef.current.style.left = '0';
+          formRef.current.style.right = '0';
+          formRef.current.style.backgroundColor = '#000F00';
+          formRef.current.style.zIndex = '100';
+          formRef.current.style.transition = 'none'; // Remove transition to prevent shifts
+        }
+
         if (messageContainerRef.current) {
-          // Adjust message container to fill available space
+          // Adjust message container to fill space above form
           const headerHeight = 48; // Approximate header height
           const inputHeight = 56; // Approximate input form height
           const availableHeight = viewport.height - headerHeight - inputHeight;
@@ -106,8 +117,9 @@ const ChatInterface: React.FC = () => {
           messageContainerRef.current.style.zIndex = '10';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
           messageContainerRef.current.style.paddingBottom = '0';
+          messageContainerRef.current.style.transition = 'none'; // Remove transition to prevent shifts
         }
-      }, 100);
+      }, 50); // Reduced timeout for faster response
     };
 
     if (isMobile && isFullscreen) {
@@ -164,27 +176,13 @@ const ChatInterface: React.FC = () => {
     e.preventDefault();
     
     if (messageInput.trim()) {
-      if (isMobile && isFullscreen) {
-        // Just send the message without any focus handling
-        await sendMessage(messageInput, replyingTo);
-        if (soundEnabled) {
-          soundManager.playMessageSound();
-        }
-        setMessageInput('');
-        setReplyingTo(null);
-      } else {
-        // Non-mobile behavior
-        await sendMessage(messageInput, replyingTo);
-        if (soundEnabled) {
-          soundManager.playMessageSound();
-        }
-        setMessageInput('');
-        setReplyingTo(null);
-        
-        if (messageContainerRef.current) {
-          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-        }
+      // Send message without any focus or scroll manipulation
+      await sendMessage(messageInput, replyingTo);
+      if (soundEnabled) {
+        soundManager.playMessageSound();
       }
+      setMessageInput('');
+      setReplyingTo(null);
     }
   };
 
