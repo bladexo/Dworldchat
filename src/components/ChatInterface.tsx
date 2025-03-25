@@ -94,17 +94,18 @@ const ChatInterface: React.FC = () => {
         }
 
         if (messageContainerRef.current) {
-          messageContainerRef.current.style.height = `${viewport.height - 108}px`;
-          messageContainerRef.current.style.maxHeight = `${viewport.height - 108}px`;
+          const headerHeight = 48; // Approximate header height
+          const formHeight = 60; // Approximate form height
+          const availableHeight = viewport.height - headerHeight - formHeight;
+          
+          messageContainerRef.current.style.height = `${availableHeight}px`;
+          messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.zIndex = '10';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
-        }
-
-        // Scroll to bottom after keyboard appears/disappears
-        if (messageContainerRef.current) {
-          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+          messageContainerRef.current.style.willChange = 'transform';
+          messageContainerRef.current.style.transform = 'translateZ(0)';
         }
       }, 100);
     };
@@ -116,20 +117,10 @@ const ChatInterface: React.FC = () => {
       // Initial setup
       handleVisualViewportChange();
       
-      // Clean up when fullscreen changes
-      const cleanup = () => {
-        document.body.style.position = '';
-        document.body.style.width = '';
-        document.body.style.height = '';
-        document.body.style.overflow = '';
-        document.body.style.overscrollBehavior = '';
-      };
-      
       return () => {
         if (timeoutId) clearTimeout(timeoutId);
         window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
         window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
-        cleanup();
       };
     }
     
@@ -173,29 +164,40 @@ const ChatInterface: React.FC = () => {
     e.preventDefault();
     
     if (messageInput.trim()) {
-      // Keep focus on input to prevent keyboard from closing
       if (isMobile && isFullscreen) {
-        // Prevent any default behaviors
-        e.stopPropagation();
-        e.nativeEvent?.stopImmediatePropagation?.();
-        
-        // Keep keyboard up by maintaining focus
-        const currentInput = inputRef.current;
-        await sendMessage(messageInput, replyingTo);
-        currentInput?.focus();
-        
-        if (soundEnabled) {
-          soundManager.playMessageSound();
-        }
-        setMessageInput('');
-        setReplyingTo(null);
-        
-        // Smooth scroll to bottom
-        if (messageContainerRef.current) {
-          messageContainerRef.current.scrollTo({
-            top: messageContainerRef.current.scrollHeight,
-            behavior: 'smooth'
+        try {
+          // Store current scroll position and input focus
+          const scrollPos = messageContainerRef.current?.scrollTop || 0;
+          const wasAtBottom = messageContainerRef.current ? 
+            (messageContainerRef.current.scrollHeight - messageContainerRef.current.scrollTop <= messageContainerRef.current.clientHeight + 50) : 
+            false;
+
+          // Send message without losing keyboard focus
+          const currentInput = inputRef.current;
+          await sendMessage(messageInput, replyingTo);
+          
+          // Play sound if enabled
+          if (soundEnabled) {
+            soundManager.playMessageSound();
+          }
+
+          // Clear input and reply state
+          setMessageInput('');
+          setReplyingTo(null);
+
+          // Restore focus immediately
+          currentInput?.focus();
+
+          // Handle scrolling after message is sent
+          requestAnimationFrame(() => {
+            if (messageContainerRef.current && wasAtBottom) {
+              messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+            } else if (messageContainerRef.current) {
+              messageContainerRef.current.scrollTop = scrollPos;
+            }
           });
+        } catch (error) {
+          console.error('Error sending message:', error);
         }
       } else {
         // Non-mobile behavior
