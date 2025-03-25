@@ -337,7 +337,7 @@ const ChatInterface: React.FC = () => {
               onReplyClick={handleReplyClick}
             />
             {typingUsersList.length > 0 && (
-              <div className="pl-2 text-xs text-neon-green/70">
+              <div className="px-2 py-1">
                 <TypingIndicator users={typingUsersList} />
               </div>
             )}
