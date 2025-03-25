@@ -61,61 +61,70 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Modify the viewport height management to only handle non-fullscreen mode
+  // Enhanced viewport height management
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
     const handleVisualViewportChange = () => {
       const viewport = window.visualViewport;
-      if (!viewport || isFullscreen) return; // Skip if in fullscreen
+      if (!viewport) return;
 
       // Clear any pending updates
       if (timeoutId) clearTimeout(timeoutId);
 
       // Delay the update slightly to ensure stable values
       timeoutId = setTimeout(() => {
-        if (isMobile && !isFullscreen) {
-          // Only adjust the chat interface height in non-fullscreen mode
-          if (messageContainerRef.current && formRef.current) {
-            const keyboardHeight = window.innerHeight - viewport.height;
-            if (keyboardHeight > 0) {
-              // Adjust the container height to account for keyboard
-              messageContainerRef.current.style.height = `calc(${viewport.height}px - 8rem)`;
-              formRef.current.style.position = 'fixed';
-              formRef.current.style.bottom = '0';
-              formRef.current.style.left = '0';
-              formRef.current.style.right = '0';
-              formRef.current.style.backgroundColor = '#000F00';
+        const vh = viewport.height * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+
+        if (isMobile) {
+          const keyboardHeight = window.innerHeight - viewport.height;
+          const isKeyboardVisible = keyboardHeight > 0;
+
+          if (chatWindowRef.current) {
+            if (isFullscreen) {
+              // Fullscreen mode handling
+              chatWindowRef.current.style.height = `calc(var(--vh, 1vh) * 100)`;
+              if (formRef.current) {
+                formRef.current.style.transform = isKeyboardVisible ? 
+                  `translateY(-${keyboardHeight}px)` : 'translateY(0)';
+              }
             } else {
-              // Reset styles when keyboard is hidden
-              messageContainerRef.current.style.height = '';
-              formRef.current.style.position = '';
-              formRef.current.style.bottom = '';
-              formRef.current.style.left = '';
-              formRef.current.style.right = '';
+              // Regular mode handling
+              chatWindowRef.current.style.height = isKeyboardVisible ? 
+                `${viewport.height * 0.9}px` : '80vh';
+              chatWindowRef.current.style.minHeight = '350px';
             }
+          }
+
+          // Scroll to bottom when keyboard appears
+          if (messageContainerRef.current) {
+            messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
           }
         }
       }, 100);
     };
 
-    // Handle input focus for non-fullscreen mode
+    // Handle input focus
     const handleInputFocus = () => {
-      if (isMobile && !isFullscreen) {
+      if (isMobile && isFullscreen) {
+        // Delay to ensure keyboard is fully shown
         setTimeout(() => {
           if (messageContainerRef.current) {
             messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
           }
+          // Force a viewport update
           handleVisualViewportChange();
         }, 300);
       }
     };
 
-    if (!isFullscreen) {
-      window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
-      window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-      inputRef.current?.addEventListener('focus', handleInputFocus);
-    }
+    window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
+    window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
+    inputRef.current?.addEventListener('focus', handleInputFocus);
+
+    // Initial setup
+    handleVisualViewportChange();
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -180,15 +189,18 @@ const ChatInterface: React.FC = () => {
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
         ref={chatWindowRef}
-        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+        className={`terminal-window w-full max-w-4xl min-w-[320px] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
           isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none fullscreen' : ''
         }`}
-        style={isFullscreen ? { 
-          margin: 0, 
-          padding: 0, 
-          height: isMobile ? 'calc(var(--vh, 1vh) * 100)' : '100%',
-          position: 'fixed',
-        } : undefined}
+        style={{
+          height: isFullscreen ? 'calc(var(--vh, 1vh) * 100)' : '80vh',
+          minHeight: '350px',
+          ...(isFullscreen ? { 
+            margin: 0, 
+            padding: 0,
+            position: 'fixed',
+          } : undefined)
+        }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
           isFullscreen ? 'border-b border-neon-green/30' : ''
