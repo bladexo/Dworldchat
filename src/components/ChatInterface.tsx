@@ -221,6 +221,13 @@ const ChatInterface: React.FC = () => {
     soundManager.toggleSound(!soundEnabled);
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();  // Prevents jumping/shifting
+      handleSendMessage(event as unknown as React.FormEvent);
+    }
+  };
+
   return (
     <>
       {currentUser && <NotificationFeed notifications={notifications} />}
@@ -383,6 +390,7 @@ const ChatInterface: React.FC = () => {
                   onChange={handleMessageInput}
                   placeholder="Type your message..."
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
+                  onKeyDown={handleKeyDown}
                 />
                 <Button 
                   type="submit" 
