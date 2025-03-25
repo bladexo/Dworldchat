@@ -83,17 +83,29 @@ const ChatInterface: React.FC = () => {
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
 
-        // Main container stays fixed
+        // Keep the main container fixed
         if (chatWindowRef.current) {
           chatWindowRef.current.style.position = 'fixed';
           chatWindowRef.current.style.top = '0';
           chatWindowRef.current.style.left = '0';
           chatWindowRef.current.style.right = '0';
           chatWindowRef.current.style.bottom = '0';
-          chatWindowRef.current.style.height = '100%';
-          chatWindowRef.current.style.display = 'flex';
-          chatWindowRef.current.style.flexDirection = 'column';
           chatWindowRef.current.style.overflow = 'hidden';
+        }
+
+        // Message container adjusts its height based on viewport
+        if (messageContainerRef.current) {
+          const headerHeight = 48; // Header height
+          const inputHeight = 56; // Input form height
+          const availableHeight = viewport.height - headerHeight - inputHeight;
+          
+          messageContainerRef.current.style.position = 'absolute';
+          messageContainerRef.current.style.top = `${headerHeight}px`;
+          messageContainerRef.current.style.left = '0';
+          messageContainerRef.current.style.right = '0';
+          messageContainerRef.current.style.height = `${availableHeight}px`;
+          messageContainerRef.current.style.overflowY = 'auto';
+          messageContainerRef.current.style.overscrollBehavior = 'contain';
         }
 
         // Form moves up with keyboard
@@ -107,16 +119,6 @@ const ChatInterface: React.FC = () => {
           if (isIOS) {
             formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
           }
-        }
-
-        // Message container takes remaining space
-        if (messageContainerRef.current) {
-          const headerHeight = 48; // Header height
-          const inputHeight = 56; // Input form height
-          const availableHeight = viewport.height - headerHeight - inputHeight;
-          messageContainerRef.current.style.height = `${availableHeight}px`;
-          messageContainerRef.current.style.overflowY = 'auto';
-          messageContainerRef.current.style.overscrollBehavior = 'contain';
         }
       }, 50);
     };
@@ -239,8 +241,6 @@ const ChatInterface: React.FC = () => {
           height: '100%',
           margin: 0,
           padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
           overflow: 'hidden',
           touchAction: 'none'
         } : {
@@ -248,9 +248,21 @@ const ChatInterface: React.FC = () => {
           overflow: 'hidden'
         }}
       >
-        <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-          isFullscreen ? 'border-b border-neon-green/30' : ''
-        }`} style={{ height: '48px' }}>
+        <div 
+          className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center ${
+            isFullscreen ? 'h-12 border-b border-neon-green/30' : ''
+          }`}
+          style={{
+            position: isFullscreen ? 'fixed' : 'relative',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)'
+          }}
+        >
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
             <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -303,16 +315,29 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className="terminal-body bg-black flex-1 flex flex-col overflow-hidden relative">
+        <div 
+          className="terminal-body bg-black flex flex-col flex-grow overflow-hidden relative"
+          style={{
+            marginTop: isFullscreen ? '48px' : '0',
+            height: isFullscreen ? 'calc(100% - 48px)' : '100%'
+          }}
+        >
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div 
             ref={messageContainerRef}
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: isFullscreen ? '56px' : '60px',
               overflowY: 'auto',
               overscrollBehavior: 'contain',
-              touchAction: 'pan-y'
+              touchAction: 'pan-y',
+              zIndex: 1,
+              willChange: 'transform'
             }}
           >
             <MessageList 
@@ -355,19 +380,21 @@ const ChatInterface: React.FC = () => {
               ref={formRef}
               onSubmit={handleSendMessage} 
               className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
-                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-10' : ''
+                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
               style={{
                 backgroundColor: '#000F00',
                 boxShadow: '0 -2px 10px rgba(0,0,0,0.3)',
-                height: '56px',
                 ...(isFullscreen ? {
                   position: 'fixed',
                   bottom: window.visualViewport?.height 
                     ? `${window.innerHeight - window.visualViewport.height}px` 
                     : '0',
                   paddingBottom: 'env(safe-area-inset-bottom)'
-                } : {})
+                } : {
+                  position: 'absolute',
+                  bottom: 0
+                })
               }}
             >
               {replyingTo && (
