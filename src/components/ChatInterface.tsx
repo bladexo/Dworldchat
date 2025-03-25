@@ -75,58 +75,48 @@ const ChatInterface: React.FC = () => {
         const keyboardHeight = window.innerHeight - viewport.height;
         
         // Lock the body in place
-        if (isFullscreen) {
-          document.body.style.position = 'fixed';
-          document.body.style.width = '100%';
-          document.body.style.height = '100%';
-          document.body.style.overflow = 'hidden';
-          document.body.style.overscrollBehavior = 'none';
-        }
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
+        document.body.style.overflow = 'hidden';
+        document.body.style.overscrollBehavior = 'none';
 
         if (chatWindowRef.current) {
-          chatWindowRef.current.style.height = '100%';
           chatWindowRef.current.style.position = 'fixed';
           chatWindowRef.current.style.top = '0';
           chatWindowRef.current.style.left = '0';
           chatWindowRef.current.style.right = '0';
           chatWindowRef.current.style.bottom = '0';
+          chatWindowRef.current.style.height = '100%';
           chatWindowRef.current.style.overflow = 'hidden';
         }
 
-        if (formRef.current) {
-          // Keep form fixed at keyboard height
-          formRef.current.style.position = 'fixed';
-          formRef.current.style.bottom = keyboardHeight > 0 ? `${keyboardHeight}px` : '0';
-          formRef.current.style.left = '0';
-          formRef.current.style.right = '0';
-          formRef.current.style.backgroundColor = '#000F00';
-          formRef.current.style.zIndex = '100';
-          formRef.current.style.transition = 'none'; // Remove transition to prevent shifts
-        }
-
         if (messageContainerRef.current) {
-          // Adjust message container to fill space above form
-          const headerHeight = 48; // Approximate header height
-          const inputHeight = 56; // Approximate input form height
+          const headerHeight = 48;
+          const inputHeight = 56;
           const availableHeight = viewport.height - headerHeight - inputHeight;
           
           messageContainerRef.current.style.height = `${availableHeight}px`;
           messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
           messageContainerRef.current.style.overflowY = 'auto';
           messageContainerRef.current.style.position = 'relative';
-          messageContainerRef.current.style.zIndex = '10';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
-          messageContainerRef.current.style.paddingBottom = '0';
-          messageContainerRef.current.style.transition = 'none'; // Remove transition to prevent shifts
         }
-      }, 50); // Reduced timeout for faster response
+
+        if (formRef.current) {
+          formRef.current.style.position = 'relative';
+          formRef.current.style.bottom = keyboardHeight > 0 ? `${keyboardHeight}px` : '0';
+          formRef.current.style.left = '0';
+          formRef.current.style.right = '0';
+          formRef.current.style.backgroundColor = '#000F00';
+          formRef.current.style.transition = 'none';
+        }
+      }, 50);
     };
 
     if (isMobile && isFullscreen) {
       window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
       window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-      
-      // Initial setup
       handleVisualViewportChange();
       
       return () => {
@@ -139,28 +129,41 @@ const ChatInterface: React.FC = () => {
     return undefined;
   }, [isMobile, isFullscreen]);
 
-  // Add cleanup when fullscreen changes
+  // Thorough cleanup when fullscreen changes
   useEffect(() => {
     if (!isFullscreen) {
-      // Reset body styles when exiting fullscreen
+      // Reset ALL styles
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.height = '';
       document.body.style.overflow = '';
       document.body.style.overscrollBehavior = '';
       
-      // Reset container styles
       if (chatWindowRef.current) {
-        chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.position = '';
+        chatWindowRef.current.style.top = '';
+        chatWindowRef.current.style.left = '';
+        chatWindowRef.current.style.right = '';
+        chatWindowRef.current.style.bottom = '';
+        chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.overflow = '';
       }
       
-      // Reset message container
       if (messageContainerRef.current) {
         messageContainerRef.current.style.height = '';
         messageContainerRef.current.style.maxHeight = '';
+        messageContainerRef.current.style.overflowY = '';
+        messageContainerRef.current.style.position = '';
         messageContainerRef.current.style.overscrollBehavior = '';
+      }
+
+      if (formRef.current) {
+        formRef.current.style.position = '';
+        formRef.current.style.bottom = '';
+        formRef.current.style.left = '';
+        formRef.current.style.right = '';
+        formRef.current.style.backgroundColor = '';
+        formRef.current.style.transition = '';
       }
     }
   }, [isFullscreen]);
@@ -176,7 +179,7 @@ const ChatInterface: React.FC = () => {
     e.preventDefault();
     
     if (messageInput.trim()) {
-      // Send message without any focus or scroll manipulation
+      // Simple send without any focus or scroll manipulation
       await sendMessage(messageInput, replyingTo);
       if (soundEnabled) {
         soundManager.playMessageSound();
