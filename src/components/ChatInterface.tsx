@@ -325,14 +325,6 @@ const ChatInterface: React.FC = () => {
                   value={messageInput}
                   onChange={handleMessageInput}
                   placeholder="Type your message..."
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck="false"
-                  data-form-type="other"
-                  type="text"
-                  role="textbox"
-                  aria-label="Chat message"
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
