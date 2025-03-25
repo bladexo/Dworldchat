@@ -162,11 +162,22 @@ const ChatInterface: React.FC = () => {
     }
   }, [isFullscreen]);
 
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Prevent default Enter behavior
+      e.stopPropagation(); // Stop event propagation
+      handleSendMessage(e as unknown as React.FormEvent);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Add this to ensure no propagation
+    
     if (messageInput.trim()) {
       if (isMobile && isFullscreen) {
-        e.stopPropagation();
+        // Keep focus on input to prevent keyboard from closing
+        inputRef.current?.focus();
       }
       
       await sendMessage(messageInput, replyingTo);
@@ -219,13 +230,6 @@ const ChatInterface: React.FC = () => {
   const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
     soundManager.toggleSound(!soundEnabled);
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();  // Prevents jumping/shifting
-      handleSendMessage(event as unknown as React.FormEvent);
-    }
   };
 
   return (
@@ -388,9 +392,9 @@ const ChatInterface: React.FC = () => {
                   ref={inputRef}
                   value={messageInput}
                   onChange={handleMessageInput}
+                  onKeyDown={handleKeyPress}
                   placeholder="Type your message..."
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
-                  onKeyDown={handleKeyDown}
                 />
                 <Button 
                   type="submit" 
