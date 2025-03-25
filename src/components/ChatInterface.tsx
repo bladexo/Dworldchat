@@ -84,7 +84,7 @@ const ChatInterface: React.FC = () => {
         }
 
         if (chatWindowRef.current) {
-          chatWindowRef.current.style.height = `${window.innerHeight}px`;
+          chatWindowRef.current.style.height = '100%';
           chatWindowRef.current.style.position = 'fixed';
           chatWindowRef.current.style.top = '0';
           chatWindowRef.current.style.left = '0';
@@ -94,9 +94,10 @@ const ChatInterface: React.FC = () => {
         }
 
         if (messageContainerRef.current) {
+          // Adjust message container to fill available space
           const headerHeight = 48; // Approximate header height
-          const formHeight = 60; // Approximate form height
-          const availableHeight = viewport.height - headerHeight - formHeight;
+          const inputHeight = 56; // Approximate input form height
+          const availableHeight = viewport.height - headerHeight - inputHeight;
           
           messageContainerRef.current.style.height = `${availableHeight}px`;
           messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
@@ -104,8 +105,7 @@ const ChatInterface: React.FC = () => {
           messageContainerRef.current.style.position = 'relative';
           messageContainerRef.current.style.zIndex = '10';
           messageContainerRef.current.style.overscrollBehavior = 'contain';
-          messageContainerRef.current.style.willChange = 'transform';
-          messageContainerRef.current.style.transform = 'translateZ(0)';
+          messageContainerRef.current.style.paddingBottom = '0';
         }
       }, 100);
     };
@@ -165,40 +165,13 @@ const ChatInterface: React.FC = () => {
     
     if (messageInput.trim()) {
       if (isMobile && isFullscreen) {
-        try {
-          // Store current scroll position and input focus
-          const scrollPos = messageContainerRef.current?.scrollTop || 0;
-          const wasAtBottom = messageContainerRef.current ? 
-            (messageContainerRef.current.scrollHeight - messageContainerRef.current.scrollTop <= messageContainerRef.current.clientHeight + 50) : 
-            false;
-
-          // Send message without losing keyboard focus
-          const currentInput = inputRef.current;
-          await sendMessage(messageInput, replyingTo);
-          
-          // Play sound if enabled
-          if (soundEnabled) {
-            soundManager.playMessageSound();
-          }
-
-          // Clear input and reply state
-          setMessageInput('');
-          setReplyingTo(null);
-
-          // Restore focus immediately
-          currentInput?.focus();
-
-          // Handle scrolling after message is sent
-          requestAnimationFrame(() => {
-            if (messageContainerRef.current && wasAtBottom) {
-              messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-            } else if (messageContainerRef.current) {
-              messageContainerRef.current.scrollTop = scrollPos;
-            }
-          });
-        } catch (error) {
-          console.error('Error sending message:', error);
+        // Just send the message without any focus handling
+        await sendMessage(messageInput, replyingTo);
+        if (soundEnabled) {
+          soundManager.playMessageSound();
         }
+        setMessageInput('');
+        setReplyingTo(null);
       } else {
         // Non-mobile behavior
         await sendMessage(messageInput, replyingTo);
