@@ -21,9 +21,16 @@ const ChatInterface: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
-  const { isFullscreen, toggleFullscreen, isIOS } = useFullscreen();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Add iOS detection
+  const isIOS = useRef(
+    typeof navigator !== 'undefined' && 
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+  ).current;
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -61,7 +68,7 @@ const ChatInterface: React.FC = () => {
     }
   }, [notifications, soundEnabled, currentUser]);
 
-  // Enhanced viewport height management
+  // Modify the viewport height management for iOS
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
@@ -69,10 +76,8 @@ const ChatInterface: React.FC = () => {
       const viewport = window.visualViewport;
       if (!viewport) return;
 
-      // Clear any pending updates
       if (timeoutId) clearTimeout(timeoutId);
 
-      // Delay the update slightly to ensure stable values
       timeoutId = setTimeout(() => {
         const vh = viewport.height * 0.01;
         document.documentElement.style.setProperty('--vh', `${vh}px`);
@@ -83,8 +88,15 @@ const ChatInterface: React.FC = () => {
 
           if (chatWindowRef.current) {
             if (isFullscreen) {
-              // Fullscreen mode handling
-              chatWindowRef.current.style.height = `calc(var(--vh, 1vh) * 100)`;
+              if (isIOS) {
+                // iOS-specific fullscreen handling
+                chatWindowRef.current.style.height = `${viewport.height}px`;
+                chatWindowRef.current.style.maxHeight = `${viewport.height}px`;
+              } else {
+                // Regular fullscreen handling
+                chatWindowRef.current.style.height = `calc(var(--vh, 1vh) * 100)`;
+              }
+
               if (formRef.current) {
                 formRef.current.style.transform = isKeyboardVisible ? 
                   `translateY(-${keyboardHeight}px)` : 'translateY(0)';
@@ -97,7 +109,6 @@ const ChatInterface: React.FC = () => {
             }
           }
 
-          // Scroll to bottom when keyboard appears
           if (messageContainerRef.current) {
             messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
           }
@@ -173,9 +184,17 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  // Modify the fullscreen toggle to handle iOS differently
   const handleFullscreenToggle = () => {
     if (chatWindowRef.current) {
-      toggleFullscreen();
+      if (isIOS) {
+        // For iOS, just toggle the CSS-based fullscreen
+        document.body.style.overflow = !isFullscreen ? 'hidden' : '';
+        toggleFullscreen();
+      } else {
+        // For other devices, use the native fullscreen API
+        toggleFullscreen();
+      }
     }
   };
 
@@ -191,18 +210,23 @@ const ChatInterface: React.FC = () => {
         ref={chatWindowRef}
         className={`terminal-window w-full max-w-4xl min-w-[320px] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
           isFullscreen ? 'fixed top-0 left-0 right-0 bottom-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none fullscreen' : ''
-        }`}
+        } ${isIOS && isFullscreen ? '!h-screen !max-h-screen' : ''}`}
         style={{
-          height: isFullscreen ? 'calc(var(--vh, 1vh) * 100)' : '80vh',
+          height: isFullscreen ? (isIOS ? '100dvh' : 'calc(var(--vh, 1vh) * 100)') : '80vh',
           minHeight: '350px',
           ...(isFullscreen ? { 
             margin: 0, 
             padding: 0,
             position: 'fixed',
-            paddingTop: isIOS ? 'env(safe-area-inset-top)' : 0,
-            paddingBottom: isIOS ? 'env(safe-area-inset-bottom)' : 0,
-            paddingLeft: isIOS ? 'env(safe-area-inset-left)' : 0,
-            paddingRight: isIOS ? 'env(safe-area-inset-right)' : 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            ...(isIOS && {
+              position: 'fixed',
+              zIndex: 9999,
+              overflow: 'hidden',
+            })
           } : undefined)
         }}
       >
@@ -261,7 +285,9 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden`}>
+        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden ${
+          isIOS && isFullscreen ? 'h-[100dvh]' : ''
+        }`}>
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div 
@@ -311,12 +337,11 @@ const ChatInterface: React.FC = () => {
               ref={formRef}
               onSubmit={handleSendMessage} 
               className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-                isFullscreen && (isMobile || isIOS) ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
+                isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
               }`}
               style={{
                 willChange: 'transform',
-                zIndex: 100,
-                paddingBottom: isIOS && isFullscreen ? 'env(safe-area-inset-bottom)' : undefined
+                zIndex: 100
               }}
             >
               {replyingTo && (
