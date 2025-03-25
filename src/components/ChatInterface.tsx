@@ -156,8 +156,6 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.bottom = '';
         chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.overflow = '';
-        chatWindowRef.current.style.margin = '';
-        chatWindowRef.current.style.padding = '';
       }
       
       if (messageContainerRef.current) {
@@ -166,20 +164,18 @@ const ChatInterface: React.FC = () => {
         messageContainerRef.current.style.overflowY = '';
         messageContainerRef.current.style.position = '';
         messageContainerRef.current.style.overscrollBehavior = '';
-        messageContainerRef.current.style.paddingBottom = '';
+        messageContainerRef.current.style.paddingBottom = '60px'; // Add padding for form
       }
 
       if (formRef.current) {
-        formRef.current.style.position = '';
-        formRef.current.style.bottom = '';
-        formRef.current.style.left = '';
-        formRef.current.style.right = '';
-        formRef.current.style.backgroundColor = '';
-        formRef.current.style.transition = '';
-        formRef.current.style.zIndex = '';
-        formRef.current.style.paddingBottom = '';
-        formRef.current.style.margin = '';
-        formRef.current.style.transform = '';
+        formRef.current.style.position = 'absolute';
+        formRef.current.style.bottom = '0';
+        formRef.current.style.left = '0';
+        formRef.current.style.right = '0';
+        formRef.current.style.backgroundColor = '#000F00';
+        formRef.current.style.transition = 'none';
+        formRef.current.style.zIndex = '10';
+        formRef.current.style.paddingBottom = '4px';
       }
     }
   }, [isFullscreen]);
@@ -249,7 +245,7 @@ const ChatInterface: React.FC = () => {
       <div 
         ref={chatWindowRef}
         className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
-          isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : ''
+          isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'relative'
         }`}
         style={isFullscreen ? {
           position: 'fixed',
@@ -261,7 +257,10 @@ const ChatInterface: React.FC = () => {
           margin: 0,
           padding: 0,
           overflow: 'hidden'
-        } : undefined}
+        } : {
+          position: 'relative',
+          overflow: 'hidden'
+        }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
           isFullscreen ? 'border-b border-neon-green/30' : ''
@@ -376,7 +375,7 @@ const ChatInterface: React.FC = () => {
               ref={formRef}
               onSubmit={handleSendMessage} 
               className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
-                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'sticky bottom-0 left-0 right-0'
+                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
               style={{
                 backgroundColor: '#000F00',
@@ -387,9 +386,8 @@ const ChatInterface: React.FC = () => {
                     ? `${window.innerHeight - window.visualViewport.height}px` 
                     : '0'
                 } : {
-                  position: 'sticky',
-                  bottom: 0,
-                  zIndex: 10
+                  position: 'absolute',
+                  bottom: 0
                 })
               }}
             >
