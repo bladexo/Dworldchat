@@ -74,98 +74,67 @@ const ChatInterface: React.FC = () => {
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
         
-        // Disable scrolling on body when in fullscreen, but not on message container
+        // Lock the body in place
         if (isFullscreen) {
           document.body.style.position = 'fixed';
           document.body.style.width = '100%';
           document.body.style.height = '100%';
           document.body.style.overflow = 'hidden';
-          // Allow touch on message container
           document.body.style.touchAction = 'none';
+          document.body.style.overscrollBehavior = 'none';
         }
 
         if (chatWindowRef.current) {
-          // Keep the main container fixed at full height
           chatWindowRef.current.style.height = `${window.innerHeight}px`;
           chatWindowRef.current.style.position = 'fixed';
           chatWindowRef.current.style.top = '0';
           chatWindowRef.current.style.left = '0';
           chatWindowRef.current.style.right = '0';
           chatWindowRef.current.style.bottom = '0';
-          // Don't block overflow on the chat window
           chatWindowRef.current.style.overflow = 'hidden';
+          chatWindowRef.current.style.overscrollBehavior = 'none';
         }
 
         if (formRef.current) {
           if (keyboardHeight > 0) {
-            // Move the form up by keyboard height
+            // Only adjust the form position, don't affect other elements
             formRef.current.style.position = 'fixed';
             formRef.current.style.bottom = `${keyboardHeight}px`;
             formRef.current.style.left = '0';
             formRef.current.style.right = '0';
             formRef.current.style.transition = 'bottom 0.2s ease-out';
             formRef.current.style.zIndex = '100';
+            formRef.current.style.backgroundColor = '#000F00';
           } else {
-            // Reset form position when keyboard is hidden
             formRef.current.style.position = 'fixed';
             formRef.current.style.bottom = '0';
             formRef.current.style.left = '0';
             formRef.current.style.right = '0';
             formRef.current.style.zIndex = '100';
+            formRef.current.style.backgroundColor = '#000F00';
           }
         }
 
         if (messageContainerRef.current) {
-          // Adjust message container height based on keyboard
-          const headerHeight = 48; // Approximate header height
-          const formHeight = formRef.current?.offsetHeight || 60; // Approximate form height
-
-          // When keyboard is visible, adjust message container
-          if (keyboardHeight > 0) {
-            const availableHeight = viewport.height - headerHeight;
-            messageContainerRef.current.style.height = `${availableHeight}px`;
-            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
-            messageContainerRef.current.style.paddingBottom = `${formHeight}px`;
-            // Enable scrolling on message container
-            messageContainerRef.current.style.overflowY = 'auto';
-            messageContainerRef.current.style.touchAction = 'pan-y';
-          } else {
-            // Reset when keyboard is hidden
-            const availableHeight = window.innerHeight - headerHeight - formHeight;
-            messageContainerRef.current.style.height = `${availableHeight}px`;
-            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
-            messageContainerRef.current.style.paddingBottom = '0';
-            // Enable scrolling on message container
-            messageContainerRef.current.style.overflowY = 'auto';
-            messageContainerRef.current.style.touchAction = 'pan-y';
-          }
-          
-          // Scroll to bottom - do this only after a delay to ensure layout is stable
-          setTimeout(() => {
-            if (messageContainerRef.current) {
-              messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-            }
-          }, 50);
+          // Keep message container height fixed
+          messageContainerRef.current.style.height = `${window.innerHeight - 108}px`;
+          messageContainerRef.current.style.maxHeight = `${window.innerHeight - 108}px`;
+          messageContainerRef.current.style.overflowY = 'auto';
+          messageContainerRef.current.style.position = 'relative';
+          messageContainerRef.current.style.zIndex = '10';
+          messageContainerRef.current.style.overscrollBehavior = 'contain';
         }
       }, 100);
     };
 
     // Handle form submission
     const handleFormSubmit = () => {
-      // Force a viewport update after form submission
-      setTimeout(handleVisualViewportChange, 100);
-    };
-
-    // Handle focus
-    const handleInputFocus = () => {
-      // Force layout recalculation when input is focused
-      setTimeout(handleVisualViewportChange, 150);
-    };
-
-    // Handle blur
-    const handleInputBlur = () => {
-      // Force layout recalculation when input loses focus
-      setTimeout(handleVisualViewportChange, 150);
+      if (isMobile && isFullscreen) {
+        // Prevent any scrolling or layout shifts when sending
+        if (messageContainerRef.current) {
+          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+        }
+      }
     };
 
     if (isMobile && isFullscreen) {
@@ -174,16 +143,6 @@ const ChatInterface: React.FC = () => {
       
       // Additional event listeners for form and input
       formRef.current?.addEventListener('submit', handleFormSubmit);
-      inputRef.current?.addEventListener('focus', handleInputFocus);
-      inputRef.current?.addEventListener('blur', handleInputBlur);
-      
-      // Allow touch events on message container but prevent them elsewhere
-      document.addEventListener('touchmove', (e) => {
-        // Don't block scrolling inside message container
-        if (isFullscreen && !messageContainerRef.current?.contains(e.target as Node)) {
-          e.preventDefault();
-        }
-      }, { passive: false });
       
       // Initial setup
       handleVisualViewportChange();
@@ -195,6 +154,7 @@ const ChatInterface: React.FC = () => {
         document.body.style.height = '';
         document.body.style.overflow = '';
         document.body.style.touchAction = '';
+        document.body.style.overscrollBehavior = '';
       };
       
       return () => {
@@ -202,13 +162,6 @@ const ChatInterface: React.FC = () => {
         window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
         window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
         formRef.current?.removeEventListener('submit', handleFormSubmit);
-        inputRef.current?.removeEventListener('focus', handleInputFocus);
-        inputRef.current?.removeEventListener('blur', handleInputBlur);
-        document.removeEventListener('touchmove', (e) => {
-          if (isFullscreen && !messageContainerRef.current?.contains(e.target as Node)) {
-            e.preventDefault();
-          }
-        });
         cleanup();
       };
     }
@@ -225,19 +178,21 @@ const ChatInterface: React.FC = () => {
       document.body.style.height = '';
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
+      document.body.style.overscrollBehavior = '';
       
       // Reset container styles
       if (chatWindowRef.current) {
         chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.position = '';
         chatWindowRef.current.style.overflow = '';
+        chatWindowRef.current.style.overscrollBehavior = '';
       }
       
       // Reset message container
       if (messageContainerRef.current) {
         messageContainerRef.current.style.height = '';
         messageContainerRef.current.style.maxHeight = '';
-        messageContainerRef.current.style.paddingBottom = '';
+        messageContainerRef.current.style.overscrollBehavior = '';
       }
       
       // Reset form
@@ -246,6 +201,7 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.bottom = '';
         formRef.current.style.left = '';
         formRef.current.style.right = '';
+        formRef.current.style.backgroundColor = '';
       }
     }
   }, [isFullscreen]);
@@ -253,11 +209,8 @@ const ChatInterface: React.FC = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (messageInput.trim()) {
-      // Prevent any scrolling or layout shifts when sending
       if (isMobile && isFullscreen) {
         e.stopPropagation();
-        // Focus on input to keep keyboard open
-        inputRef.current?.focus();
       }
       
       await sendMessage(messageInput, replyingTo);
@@ -267,12 +220,10 @@ const ChatInterface: React.FC = () => {
       setMessageInput('');
       setReplyingTo(null);
       
-      // Make sure we scroll to bottom after sending
-      setTimeout(() => {
-        if (messageContainerRef.current) {
-          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-        }
-      }, 100);
+      // Scroll to bottom after sending
+      if (messageContainerRef.current) {
+        messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+      }
     }
   };
 
