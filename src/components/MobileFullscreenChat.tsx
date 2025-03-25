@@ -69,7 +69,6 @@ const MobileFullscreenChat: React.FC<MobileFullscreenChatProps> = ({
     const keyboardHeight = window.innerHeight - viewport.height;
     const headerHeight = 48;
     const inputHeight = 56;
-    const availableHeight = viewport.height - headerHeight - inputHeight;
 
     if (chatWindowRef.current) {
       Object.assign(chatWindowRef.current.style, {
@@ -79,18 +78,20 @@ const MobileFullscreenChat: React.FC<MobileFullscreenChatProps> = ({
         right: '0',
         bottom: '0',
         height: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
       });
     }
 
     if (messageContainerRef.current) {
       Object.assign(messageContainerRef.current.style, {
-        height: `${availableHeight}px`,
-        maxHeight: `${availableHeight}px`,
+        flex: '1 1 auto',
+        height: `calc(${viewport.height}px - ${headerHeight + inputHeight}px)`,
         overflowY: 'auto',
-        position: 'relative',
         overscrollBehavior: 'contain',
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'touch',
+        paddingBottom: '8px'
       });
     }
 
@@ -101,9 +102,11 @@ const MobileFullscreenChat: React.FC<MobileFullscreenChatProps> = ({
         left: '0',
         right: '0',
         backgroundColor: '#000F00',
-        transition: 'none',
+        borderTop: '1px solid rgba(57, 255, 20, 0.3)',
         padding: '8px',
-        borderTop: '1px solid rgba(57, 255, 20, 0.3)'
+        transform: 'translateZ(0)', // Force GPU acceleration
+        willChange: 'transform', // Optimize animations
+        zIndex: '50'
       });
     }
   };
@@ -116,10 +119,14 @@ const MobileFullscreenChat: React.FC<MobileFullscreenChatProps> = ({
   };
 
   return (
-    <div ref={chatWindowRef} className="mobile-fullscreen-chat bg-[#001100]">
+    <div ref={chatWindowRef} className="mobile-fullscreen-chat bg-[#001100] fixed inset-0">
+      <div className="terminal-header bg-black/40 px-2 py-1 flex justify-between items-center h-[48px] border-b border-neon-green/30">
+        <span className="font-mono text-xs text-neon-green">GLOBAL_CHAT</span>
+      </div>
+      
       <div 
         ref={messageContainerRef}
-        className="message-container"
+        className="message-container bg-[#001100]"
       >
         <MessageList 
           messages={messages} 
@@ -133,7 +140,7 @@ const MobileFullscreenChat: React.FC<MobileFullscreenChatProps> = ({
       <form 
         ref={formRef}
         onSubmit={onSendMessage} 
-        className="input-form"
+        className="input-form bg-[#000F00]"
       >
         {replyingTo && (
           <div className="flex items-center gap-2 p-2 rounded bg-black/40 border border-neon-green/30 mb-2">
