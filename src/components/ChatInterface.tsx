@@ -21,10 +21,9 @@ const ChatInterface: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
-  const { isFullscreen, toggleFullscreen, isIOS, isIOSKeyboardVisible } = useFullscreen();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -72,6 +71,8 @@ const ChatInterface: React.FC = () => {
   // Enhanced viewport height management
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
     const handleVisualViewportChange = () => {
       const viewport = window.visualViewport;
@@ -82,59 +83,80 @@ const ChatInterface: React.FC = () => {
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
         
-        // Lock the body in place
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
-        document.body.style.height = '100%';
-        document.body.style.overflow = 'hidden';
-        document.body.style.overscrollBehavior = 'none';
+        // Special handling for iOS
+        if (isIOS) {
+          document.body.style.height = `${viewport.height}px`;
+          document.body.style.position = 'fixed';
+          document.body.style.width = '100%';
+          document.body.style.overflow = 'hidden';
 
-        if (chatWindowRef.current) {
-          chatWindowRef.current.style.position = 'fixed';
-          chatWindowRef.current.style.top = '0';
-          chatWindowRef.current.style.left = '0';
-          chatWindowRef.current.style.right = '0';
-          chatWindowRef.current.style.bottom = '0';
-          chatWindowRef.current.style.height = '100%';
-          chatWindowRef.current.style.overflow = 'hidden';
-        }
-
-        if (headerRef.current && isIOS) {
-          headerRef.current.style.position = 'fixed';
-          headerRef.current.style.top = '0';
-          headerRef.current.style.left = '0';
-          headerRef.current.style.right = '0';
-          headerRef.current.style.zIndex = '100';
-        }
-
-        if (messageContainerRef.current) {
-          const headerHeight = 48;
-          const inputHeight = 56;
-          const availableHeight = viewport.height - headerHeight - inputHeight;
-          
-          if (isIOS) {
-            messageContainerRef.current.style.marginTop = '48px';
-            messageContainerRef.current.style.height = `${availableHeight}px`;
-            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
-          } else {
-            messageContainerRef.current.style.height = `${availableHeight}px`;
-            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
+          if (chatWindowRef.current) {
+            chatWindowRef.current.style.height = `${viewport.height}px`;
+            chatWindowRef.current.style.position = 'fixed';
+            chatWindowRef.current.style.top = '0';
+            chatWindowRef.current.style.left = '0';
+            chatWindowRef.current.style.right = '0';
           }
-          
-          messageContainerRef.current.style.overflowY = 'auto';
-          messageContainerRef.current.style.position = 'relative';
-          messageContainerRef.current.style.overscrollBehavior = 'contain';
-        }
 
-        if (formRef.current) {
-          formRef.current.style.position = 'fixed';
-          formRef.current.style.bottom = keyboardHeight > 0 ? `${keyboardHeight}px` : '0';
-          formRef.current.style.left = '0';
-          formRef.current.style.right = '0';
-          formRef.current.style.backgroundColor = '#000F00';
-          formRef.current.style.transition = 'none';
-          formRef.current.style.zIndex = '50';
-          formRef.current.style.paddingBottom = keyboardHeight > 0 ? '8px' : '4px';
+          if (messageContainerRef.current) {
+            const headerHeight = 48;
+            const inputHeight = 56;
+            const availableHeight = viewport.height - headerHeight - inputHeight;
+            
+            messageContainerRef.current.style.height = `${availableHeight}px`;
+            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
+            messageContainerRef.current.style.overflowY = 'auto';
+            messageContainerRef.current.style.position = 'relative';
+            messageContainerRef.current.style.overscrollBehavior = 'contain';
+          }
+
+          if (formRef.current) {
+            formRef.current.style.position = 'fixed';
+            formRef.current.style.bottom = '0';
+            formRef.current.style.left = '0';
+            formRef.current.style.right = '0';
+            formRef.current.style.backgroundColor = '#000F00';
+            formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+          }
+        } else {
+          // Existing Android/other browsers behavior
+          document.body.style.position = 'fixed';
+          document.body.style.width = '100%';
+          document.body.style.height = '100%';
+          document.body.style.overflow = 'hidden';
+          document.body.style.overscrollBehavior = 'none';
+
+          if (chatWindowRef.current) {
+            chatWindowRef.current.style.position = 'fixed';
+            chatWindowRef.current.style.top = '0';
+            chatWindowRef.current.style.left = '0';
+            chatWindowRef.current.style.right = '0';
+            chatWindowRef.current.style.bottom = '0';
+            chatWindowRef.current.style.height = '100%';
+            chatWindowRef.current.style.overflow = 'hidden';
+          }
+
+          if (messageContainerRef.current) {
+            const headerHeight = 48;
+            const inputHeight = 56;
+            const availableHeight = viewport.height - headerHeight - inputHeight;
+            
+            messageContainerRef.current.style.height = `${availableHeight}px`;
+            messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
+            messageContainerRef.current.style.overflowY = 'auto';
+            messageContainerRef.current.style.position = 'relative';
+            messageContainerRef.current.style.overscrollBehavior = 'contain';
+          }
+
+          if (formRef.current) {
+            formRef.current.style.position = 'fixed';
+            formRef.current.style.bottom = keyboardHeight > 0 ? `${keyboardHeight}px` : '0';
+            formRef.current.style.left = '0';
+            formRef.current.style.right = '0';
+            formRef.current.style.backgroundColor = '#000F00';
+            formRef.current.style.transition = 'none';
+            formRef.current.style.zIndex = '50';
+          }
         }
       }, 50);
     };
@@ -152,7 +174,7 @@ const ChatInterface: React.FC = () => {
     }
     
     return undefined;
-  }, [isMobile, isFullscreen, isIOS]);
+  }, [isMobile, isFullscreen]);
 
   // Thorough cleanup when fullscreen changes
   useEffect(() => {
@@ -279,21 +301,9 @@ const ChatInterface: React.FC = () => {
           overflow: 'hidden'
         }}
       >
-        <div 
-          ref={headerRef}
-          className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-            isFullscreen ? 'border-b border-neon-green/30' : ''
-          }`}
-          style={isIOS && isFullscreen ? {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            backdropFilter: 'blur(10px)'
-          } : undefined}
-        >
+        <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
+          isFullscreen ? 'border-b border-neon-green/30' : ''
+        }`}>
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
             <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -359,10 +369,7 @@ const ChatInterface: React.FC = () => {
               overscrollBehavior: 'contain',
               WebkitOverflowScrolling: 'touch',
               height: isFullscreen ? 'calc(100dvh - 108px)' : 'calc(100% - 60px)',
-              paddingBottom: isFullscreen ? '0' : '60px',
-              ...(isIOS && isFullscreen && {
-                marginTop: '48px'
-              })
+              paddingBottom: isFullscreen ? '0' : '60px'
             }}
           >
             <MessageList 
