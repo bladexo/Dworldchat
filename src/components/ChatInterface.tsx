@@ -336,11 +336,10 @@ const ChatInterface: React.FC = () => {
               messages={messages} 
               onReplyClick={handleReplyClick}
             />
-          </div>
-          
-          <div className="flex-shrink-0">
             {typingUsersList.length > 0 && (
-              <TypingIndicator users={typingUsersList} />
+              <div className="sticky bottom-0 pb-2">
+                <TypingIndicator users={typingUsersList} />
+              </div>
             )}
           </div>
           
