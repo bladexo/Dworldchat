@@ -86,18 +86,24 @@ const ChatInterface: React.FC = () => {
         // Lock the body in place for both iOS and Android
         document.body.style.position = 'fixed';
         document.body.style.width = '100%';
-        document.body.style.height = '100%';
+        document.body.style.height = `${window.innerHeight}px`;
         document.body.style.overflow = 'hidden';
         document.body.style.overscrollBehavior = 'none';
+        document.body.style.top = '0';
+        document.body.style.left = '0';
 
         if (chatWindowRef.current) {
-          chatWindowRef.current.style.position = 'fixed';
-          chatWindowRef.current.style.top = '0';
-          chatWindowRef.current.style.left = '0';
-          chatWindowRef.current.style.right = '0';
-          chatWindowRef.current.style.bottom = '0';
-          chatWindowRef.current.style.height = '100%';
-          chatWindowRef.current.style.overflow = 'hidden';
+          Object.assign(chatWindowRef.current.style, {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            right: '0',
+            bottom: '0',
+            height: `${window.innerHeight}px`,
+            overflow: 'hidden',
+            transform: 'translate3d(0, 0, 0)',
+            WebkitTransform: 'translate3d(0, 0, 0)'
+          });
         }
 
         if (messageContainerRef.current) {
@@ -105,36 +111,59 @@ const ChatInterface: React.FC = () => {
           const inputHeight = 56;
           const availableHeight = viewport.height - headerHeight - inputHeight;
           
-          messageContainerRef.current.style.height = `${availableHeight}px`;
-          messageContainerRef.current.style.maxHeight = `${availableHeight}px`;
-          messageContainerRef.current.style.overflowY = 'auto';
-          messageContainerRef.current.style.position = 'relative';
-          messageContainerRef.current.style.overscrollBehavior = 'contain';
-          (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = 'touch';
+          Object.assign(messageContainerRef.current.style, {
+            height: `${availableHeight}px`,
+            maxHeight: `${availableHeight}px`,
+            overflowY: 'auto',
+            position: 'relative',
+            overscrollBehavior: 'contain',
+            WebkitOverflowScrolling: 'touch',
+            transform: 'translate3d(0, 0, 0)',
+            WebkitTransform: 'translate3d(0, 0, 0)'
+          });
         }
 
         if (formRef.current) {
-          formRef.current.style.position = 'fixed';
-          formRef.current.style.bottom = keyboardHeight > 0 ? `${keyboardHeight}px` : '0';
-          formRef.current.style.left = '0';
-          formRef.current.style.right = '0';
-          formRef.current.style.backgroundColor = '#000F00';
-          formRef.current.style.transition = 'none';
-          formRef.current.style.zIndex = '50';
-          formRef.current.style.paddingBottom = isIOS ? 'env(safe-area-inset-bottom)' : '0';
+          Object.assign(formRef.current.style, {
+            position: 'fixed',
+            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0',
+            left: '0',
+            right: '0',
+            backgroundColor: '#000F00',
+            transition: 'none',
+            zIndex: '50',
+            paddingBottom: isIOS ? 'env(safe-area-inset-bottom)' : '0',
+            transform: 'translate3d(0, 0, 0)',
+            WebkitTransform: 'translate3d(0, 0, 0)'
+          });
         }
-      }, 50);
+      }, 16); // Reduced timeout for smoother updates
     };
 
     if (isMobile && isFullscreen) {
+      // Initial setup
+      handleVisualViewportChange();
+      
+      // Add event listeners
       window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
       window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-      handleVisualViewportChange();
+      
+      // Prevent scrolling on the body
+      document.body.addEventListener('touchmove', (e) => {
+        if (e.target === document.body) {
+          e.preventDefault();
+        }
+      }, { passive: false });
       
       return () => {
         if (timeoutId) clearTimeout(timeoutId);
         window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
         window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
+        document.body.removeEventListener('touchmove', (e) => {
+          if (e.target === document.body) {
+            e.preventDefault();
+          }
+        });
       };
     }
     
@@ -145,40 +174,28 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     if (!isFullscreen) {
       // Reset ALL styles
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.height = '';
-      document.body.style.overflow = '';
-      document.body.style.overscrollBehavior = '';
+      document.body.style.cssText = '';
       
       if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = '';
-        chatWindowRef.current.style.top = '';
-        chatWindowRef.current.style.left = '';
-        chatWindowRef.current.style.right = '';
-        chatWindowRef.current.style.bottom = '';
-        chatWindowRef.current.style.height = '';
-        chatWindowRef.current.style.overflow = '';
+        chatWindowRef.current.style.cssText = '';
       }
       
       if (messageContainerRef.current) {
-        messageContainerRef.current.style.height = '';
-        messageContainerRef.current.style.maxHeight = '';
-        messageContainerRef.current.style.overflowY = '';
-        messageContainerRef.current.style.position = '';
-        messageContainerRef.current.style.overscrollBehavior = '';
-        messageContainerRef.current.style.paddingBottom = '60px'; // Add padding for form
+        messageContainerRef.current.style.cssText = '';
+        messageContainerRef.current.style.paddingBottom = '60px';
       }
 
       if (formRef.current) {
-        formRef.current.style.position = 'absolute';
-        formRef.current.style.bottom = '0';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
-        formRef.current.style.backgroundColor = '#000F00';
-        formRef.current.style.transition = 'none';
-        formRef.current.style.zIndex = '10';
-        formRef.current.style.paddingBottom = '4px';
+        formRef.current.style.cssText = '';
+        Object.assign(formRef.current.style, {
+          position: 'absolute',
+          bottom: '0',
+          left: '0',
+          right: '0',
+          backgroundColor: '#000F00',
+          zIndex: '10',
+          paddingBottom: '4px'
+        });
       }
     }
   }, [isFullscreen]);
