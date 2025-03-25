@@ -1,38 +1,42 @@
-import * as React from "react"
+import { useState, useCallback, useEffect } from 'react';
 
-export function useFullscreen() {
-  const [isFullscreen, setIsFullscreen] = React.useState(false)
+// Helper to detect iOS
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-  const toggleFullscreen = React.useCallback(() => {
-    if (!document.fullscreenElement) {
-      // Enter fullscreen
-      document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true)
-      }).catch(err => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`)
-      })
+export const useFullscreen = () => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const handleFullscreenChange = useCallback(() => {
+    if (!isIOS) {
+      setIsFullscreen(document.fullscreenElement !== null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isIOS) {
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }
+  }, [handleFullscreenChange]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (isIOS) {
+      // For iOS, just toggle the state
+      setIsFullscreen(!isFullscreen);
     } else {
-      // Exit fullscreen
-      document.exitFullscreen().then(() => {
-        setIsFullscreen(false)
-      }).catch(err => {
-        console.error(`Error attempting to exit fullscreen: ${err.message}`)
-      })
+      // For other devices, use the Fullscreen API
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen().catch(err => {
+          console.error(`Error attempting to exit fullscreen: ${err.message}`);
+        });
+      }
     }
-  }, [])
+  }, [isFullscreen]);
 
-  // Update fullscreen state when it changes outside our control
-  React.useEffect(() => {
-    const onFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
-    }
-
-    document.addEventListener('fullscreenchange', onFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
-  }, [])
-
-  return {
-    isFullscreen,
-    toggleFullscreen
-  }
-} 
+  return { isFullscreen, toggleFullscreen };
+}; 
