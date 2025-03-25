@@ -21,7 +21,7 @@ const ChatInterface: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
-  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const { isFullscreen, toggleFullscreen, isIOS } = useFullscreen();
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -199,6 +199,10 @@ const ChatInterface: React.FC = () => {
             margin: 0, 
             padding: 0,
             position: 'fixed',
+            paddingTop: isIOS ? 'env(safe-area-inset-top)' : 0,
+            paddingBottom: isIOS ? 'env(safe-area-inset-bottom)' : 0,
+            paddingLeft: isIOS ? 'env(safe-area-inset-left)' : 0,
+            paddingRight: isIOS ? 'env(safe-area-inset-right)' : 0,
           } : undefined)
         }}
       >
@@ -307,11 +311,12 @@ const ChatInterface: React.FC = () => {
               ref={formRef}
               onSubmit={handleSendMessage} 
               className={`flex-shrink-0 pt-1 pb-1 sm:pb-1 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-1 sm:px-1 ${
-                isFullscreen && isMobile ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
+                isFullscreen && (isMobile || isIOS) ? 'fixed bottom-0 left-0 right-0 border-t border-neon-green/30' : ''
               }`}
               style={{
                 willChange: 'transform',
-                zIndex: 100
+                zIndex: 100,
+                paddingBottom: isIOS && isFullscreen ? 'env(safe-area-inset-bottom)' : undefined
               }}
             >
               {replyingTo && (
