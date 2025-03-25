@@ -82,109 +82,48 @@ const ChatInterface: React.FC = () => {
 
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
-        
-        // Lock everything in place
-        document.documentElement.style.position = 'fixed';
-        document.documentElement.style.width = '100%';
-        document.documentElement.style.height = '100%';
-        document.documentElement.style.overflow = 'hidden';
-        
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
-        document.body.style.height = '100%';
-        document.body.style.overflow = 'hidden';
-        document.body.style.top = '0';
-        document.body.style.left = '0';
 
+        // Simple fixed positioning for the container
         if (chatWindowRef.current) {
-          Object.assign(chatWindowRef.current.style, {
-            position: 'fixed',
-            top: '0',
-            left: '0',
-            right: '0',
-            width: '100%',
-            height: '100%',
-            overflow: 'hidden',
-            transform: 'translate3d(0, 0, 0)',
-            WebkitTransform: 'translate3d(0, 0, 0)',
-            margin: '0',
-            padding: '0'
-          });
+          chatWindowRef.current.style.position = 'fixed';
+          chatWindowRef.current.style.top = '0';
+          chatWindowRef.current.style.left = '0';
+          chatWindowRef.current.style.right = '0';
+          chatWindowRef.current.style.bottom = '0';
         }
 
+        // Message container adjusts its height based on keyboard
         if (messageContainerRef.current) {
-          const headerHeight = 48;
-          const inputHeight = 56;
+          const headerHeight = 48; // Header height
+          const inputHeight = 56; // Input form height
           const availableHeight = viewport.height - headerHeight - inputHeight;
-          
-          Object.assign(messageContainerRef.current.style, {
-            height: `${availableHeight}px`,
-            maxHeight: `${availableHeight}px`,
-            overflowY: 'auto',
-            position: 'absolute',
-            top: `${headerHeight}px`,
-            left: '0',
-            right: '0',
-            bottom: `${inputHeight}px`,
-            overscrollBehavior: 'contain',
-            WebkitOverflowScrolling: 'touch',
-            transform: 'translate3d(0, 0, 0)',
-            WebkitTransform: 'translate3d(0, 0, 0)',
-            margin: '0',
-            padding: '0'
-          });
-
-          // Ensure scroll to bottom
-          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+          messageContainerRef.current.style.height = `${availableHeight}px`;
+          messageContainerRef.current.style.overflowY = 'auto';
         }
 
+        // Form moves up with keyboard
         if (formRef.current) {
-          Object.assign(formRef.current.style, {
-            position: 'fixed',
-            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0',
-            left: '0',
-            right: '0',
-            backgroundColor: '#000F00',
-            transition: 'none',
-            zIndex: '50',
-            transform: 'translate3d(0, 0, 0)',
-            WebkitTransform: 'translate3d(0, 0, 0)',
-            margin: '0',
-            padding: '8px',
-            paddingBottom: isIOS ? `calc(8px + env(safe-area-inset-bottom))` : '8px'
-          });
+          formRef.current.style.position = 'fixed';
+          formRef.current.style.left = '0';
+          formRef.current.style.right = '0';
+          formRef.current.style.bottom = `${keyboardHeight}px`;
+          formRef.current.style.backgroundColor = '#000F00';
+          if (isIOS) {
+            formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+          }
         }
-      }, 16);
+      }, 50);
     };
 
     if (isMobile && isFullscreen) {
-      // Initial setup
-      handleVisualViewportChange();
-      
-      // Add event listeners
       window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
       window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-      
-      // Prevent any scrolling on body and html
-      const preventScroll = (e: TouchEvent) => {
-        if (e.target === document.body || e.target === document.documentElement) {
-          e.preventDefault();
-        }
-      };
-      
-      document.body.addEventListener('touchmove', preventScroll, { passive: false });
-      document.documentElement.addEventListener('touchmove', preventScroll, { passive: false });
+      handleVisualViewportChange();
       
       return () => {
         if (timeoutId) clearTimeout(timeoutId);
         window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
         window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
-        document.body.removeEventListener('touchmove', preventScroll);
-        document.documentElement.removeEventListener('touchmove', preventScroll);
-        
-        // Reset styles
-        document.documentElement.style.cssText = '';
-        document.body.style.cssText = '';
       };
     }
     
@@ -194,29 +133,26 @@ const ChatInterface: React.FC = () => {
   // Thorough cleanup when fullscreen changes
   useEffect(() => {
     if (!isFullscreen) {
-      // Reset ALL styles
-      document.body.style.cssText = '';
-      
       if (chatWindowRef.current) {
-        chatWindowRef.current.style.cssText = '';
+        chatWindowRef.current.style.position = '';
+        chatWindowRef.current.style.top = '';
+        chatWindowRef.current.style.left = '';
+        chatWindowRef.current.style.right = '';
+        chatWindowRef.current.style.bottom = '';
       }
       
       if (messageContainerRef.current) {
-        messageContainerRef.current.style.cssText = '';
+        messageContainerRef.current.style.height = '';
+        messageContainerRef.current.style.overflowY = '';
         messageContainerRef.current.style.paddingBottom = '60px';
       }
 
       if (formRef.current) {
-        formRef.current.style.cssText = '';
-        Object.assign(formRef.current.style, {
-          position: 'absolute',
-          bottom: '0',
-          left: '0',
-          right: '0',
-          backgroundColor: '#000F00',
-          zIndex: '10',
-          paddingBottom: '4px'
-        });
+        formRef.current.style.position = 'absolute';
+        formRef.current.style.bottom = '0';
+        formRef.current.style.left = '0';
+        formRef.current.style.right = '0';
+        formRef.current.style.paddingBottom = '4px';
       }
     }
   }, [isFullscreen]);
