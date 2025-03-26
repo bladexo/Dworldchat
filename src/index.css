@@ -181,10 +181,12 @@
 }
 
 .fullscreen-body {
-  position: relative !important;
-  flex: 1 1 auto !important;
+  position: absolute !important;
+  top: 48px !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   overflow: hidden !important;
-  margin-top: 48px !important;
   transform: translateZ(0) !important;
   -webkit-transform: translateZ(0) !important;
   backface-visibility: hidden !important;
