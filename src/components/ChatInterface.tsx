@@ -77,56 +77,81 @@ const ChatInterface: React.FC = () => {
       const keyboardHeight = window.innerHeight - viewport.height;
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-      // Set the main container height using dvh
+      // Lock body scroll
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+
+      // Main container takes full viewport
       if (chatWindowRef.current) {
         chatWindowRef.current.style.position = 'fixed';
         chatWindowRef.current.style.top = '0';
         chatWindowRef.current.style.left = '0';
         chatWindowRef.current.style.right = '0';
-        chatWindowRef.current.style.height = '100dvh';
+        chatWindowRef.current.style.bottom = '0';
+        chatWindowRef.current.style.height = `${viewport.height}px`;
         chatWindowRef.current.style.overflow = 'hidden';
+        chatWindowRef.current.style.touchAction = 'none';
       }
 
-      // Message container adjusts height
+      // Message container adjusts height and maintains scroll
       if (messageContainerRef.current) {
         const headerHeight = 48; // Header height
         const inputHeight = 56; // Input form height
         const safeAreaBottom = isIOS ? 20 : 0; // Account for iOS safe area
-        const totalOffset = headerHeight + inputHeight + safeAreaBottom;
         
-        if (keyboardHeight > 0) {
-          messageContainerRef.current.style.height = `${viewport.height - totalOffset}px`;
-        } else {
-          messageContainerRef.current.style.height = `calc(100dvh - ${totalOffset}px)`;
-        }
+        messageContainerRef.current.style.position = 'absolute';
+        messageContainerRef.current.style.top = `${headerHeight}px`;
+        messageContainerRef.current.style.left = '0';
+        messageContainerRef.current.style.right = '0';
+        messageContainerRef.current.style.bottom = `${inputHeight + safeAreaBottom}px`;
         messageContainerRef.current.style.overflowY = 'auto';
+        messageContainerRef.current.style.touchAction = 'pan-y';
+        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = 'touch';
       }
 
-      // Form moves up with keyboard
+      // Form stays at bottom
       if (formRef.current) {
-        formRef.current.style.position = 'fixed';
+        formRef.current.style.position = 'absolute';
         formRef.current.style.left = '0';
         formRef.current.style.right = '0';
-        formRef.current.style.bottom = `${keyboardHeight}px`;
+        formRef.current.style.bottom = '0';
         formRef.current.style.backgroundColor = '#000F00';
         if (isIOS) {
           formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+          formRef.current.style.transform = `translateY(-${keyboardHeight}px)`;
         }
       }
     };
 
     if (isMobile && isFullscreen) {
+      // Prevent default touch behaviors
+      const preventDefault = (e: TouchEvent) => {
+        if (e.target !== messageContainerRef.current && !messageContainerRef.current?.contains(e.target as Node)) {
+          e.preventDefault();
+        }
+      };
+      
+      document.addEventListener('touchmove', preventDefault, { passive: false });
       window.visualViewport?.addEventListener('resize', adjustChatHeight);
       window.visualViewport?.addEventListener('scroll', adjustChatHeight);
-      adjustChatHeight(); // Initial adjustment
-      
-      // Also adjust on orientation change
       window.addEventListener('orientationchange', adjustChatHeight);
+      adjustChatHeight();
       
       return () => {
+        document.removeEventListener('touchmove', preventDefault);
         window.visualViewport?.removeEventListener('resize', adjustChatHeight);
         window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
         window.removeEventListener('orientationchange', adjustChatHeight);
+        
+        // Reset body styles
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        document.body.style.overflow = '';
+        document.body.style.touchAction = '';
       };
     }
     
@@ -136,18 +161,33 @@ const ChatInterface: React.FC = () => {
   // Cleanup when fullscreen changes
   useEffect(() => {
     if (!isFullscreen) {
+      // Reset body styles
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+
       if (chatWindowRef.current) {
         chatWindowRef.current.style.position = '';
         chatWindowRef.current.style.top = '';
         chatWindowRef.current.style.left = '';
         chatWindowRef.current.style.right = '';
+        chatWindowRef.current.style.bottom = '';
         chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.overflow = '';
+        chatWindowRef.current.style.touchAction = '';
       }
       
       if (messageContainerRef.current) {
-        messageContainerRef.current.style.height = '';
+        messageContainerRef.current.style.position = '';
+        messageContainerRef.current.style.top = '';
+        messageContainerRef.current.style.left = '';
+        messageContainerRef.current.style.right = '';
+        messageContainerRef.current.style.bottom = '';
         messageContainerRef.current.style.overflowY = '';
+        messageContainerRef.current.style.touchAction = '';
+        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = '';
       }
 
       if (formRef.current) {
@@ -156,6 +196,7 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.left = '';
         formRef.current.style.right = '';
         formRef.current.style.paddingBottom = '';
+        formRef.current.style.transform = '';
       }
     }
   }, [isFullscreen]);
