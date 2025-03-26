@@ -248,20 +248,9 @@ const ChatInterface: React.FC = () => {
           overflow: 'hidden'
         }}
       >
-        <div 
-          className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-            isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-20 sticky-header' : ''
-          }`}
-          style={isFullscreen ? {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 20,
-            backgroundColor: 'rgba(0, 0, 0, 0.4)',
-            height: '48px'
-          } : undefined}
-        >
+        <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
+          isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-20 !fixed !top-0 !left-0 !right-0 !z-20 bg-black/40 backdrop-blur-sm' : ''
+        }`}>
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
             <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -314,17 +303,7 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div 
-          className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative ${
-            isFullscreen ? 'fullscreen-body' : ''
-          }`}
-          style={isFullscreen ? {
-            position: 'relative',
-            flex: '1 1 auto',
-            overflow: 'hidden',
-            marginTop: '48px'
-          } : undefined}
-        >
+        <div className="terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative">
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div 
