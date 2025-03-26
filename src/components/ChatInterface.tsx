@@ -83,29 +83,22 @@ const ChatInterface: React.FC = () => {
       timeoutId = setTimeout(() => {
         const keyboardHeight = window.innerHeight - viewport.height;
 
-        // Keep the main container fixed
+        // Simple fixed positioning for the container
         if (chatWindowRef.current) {
           chatWindowRef.current.style.position = 'fixed';
           chatWindowRef.current.style.top = '0';
           chatWindowRef.current.style.left = '0';
           chatWindowRef.current.style.right = '0';
           chatWindowRef.current.style.bottom = '0';
-          chatWindowRef.current.style.overflow = 'hidden';
         }
 
-        // Message container adjusts its height based on viewport
+        // Message container adjusts its height based on keyboard
         if (messageContainerRef.current) {
           const headerHeight = 48; // Header height
           const inputHeight = 56; // Input form height
           const availableHeight = viewport.height - headerHeight - inputHeight;
-          
-          messageContainerRef.current.style.position = 'absolute';
-          messageContainerRef.current.style.top = `${headerHeight}px`;
-          messageContainerRef.current.style.left = '0';
-          messageContainerRef.current.style.right = '0';
           messageContainerRef.current.style.height = `${availableHeight}px`;
           messageContainerRef.current.style.overflowY = 'auto';
-          messageContainerRef.current.style.overscrollBehavior = 'contain';
         }
 
         // Form moves up with keyboard
@@ -115,7 +108,6 @@ const ChatInterface: React.FC = () => {
           formRef.current.style.right = '0';
           formRef.current.style.bottom = `${keyboardHeight}px`;
           formRef.current.style.backgroundColor = '#000F00';
-          formRef.current.style.zIndex = '10';
           if (isIOS) {
             formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
           }
@@ -249,7 +241,7 @@ const ChatInterface: React.FC = () => {
         }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-          isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-20 !fixed !top-0 !left-0 !right-0 !z-20 bg-black/40 backdrop-blur-sm' : ''
+          isFullscreen ? 'border-b border-neon-green/30' : ''
         }`}>
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -311,7 +303,7 @@ const ChatInterface: React.FC = () => {
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
               position: 'absolute',
-              top: isFullscreen ? '48px' : '0',
+              top: 0,
               left: 0,
               right: 0,
               bottom: isFullscreen ? '56px' : '60px',
