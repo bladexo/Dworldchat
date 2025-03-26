@@ -137,14 +137,24 @@ const ChatInterface: React.FC = () => {
 
     const preventScroll = (e: TouchEvent) => {
       if (e.target instanceof Element) {
-        if (!messageContainerRef.current?.contains(e.target)) {
-          e.preventDefault();
+        // Allow interaction with message container and form elements
+        if (messageContainerRef.current?.contains(e.target) || 
+            formRef.current?.contains(e.target)) {
+          return; // Allow the event
         }
+        e.preventDefault();
       }
     };
 
     const preventBounce = (e: TouchEvent) => {
-      e.preventDefault();
+      if (e.target instanceof Element) {
+        // Allow interaction with message container and form elements
+        if (messageContainerRef.current?.contains(e.target) || 
+            formRef.current?.contains(e.target)) {
+          return; // Allow the event
+        }
+        e.preventDefault();
+      }
     };
 
     if (isMobile && isFullscreen) {
@@ -152,6 +162,7 @@ const ChatInterface: React.FC = () => {
       window.visualViewport?.addEventListener('resize', adjustChatHeight);
       window.visualViewport?.addEventListener('scroll', adjustChatHeight);
       document.addEventListener('touchmove', preventScroll, { passive: false });
+      // Only prevent touchstart on non-interactive elements
       document.addEventListener('touchstart', preventBounce, { passive: false });
       document.body.addEventListener('scroll', preventBounce, { passive: false });
       adjustChatHeight();
