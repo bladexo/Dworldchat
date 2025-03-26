@@ -68,53 +68,34 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Enhanced viewport height management with fixed elements
+  // Enhanced viewport height management with dvh units
   useEffect(() => {
     const adjustChatHeight = () => {
       const viewport = window.visualViewport;
-      if (!viewport || !isMobile || !isFullscreen) return;
+      if (!viewport || !isMobile || !isFullscreen || !messageContainerRef.current) return;
 
       const keyboardHeight = window.innerHeight - viewport.height;
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const headerHeight = 48; // Header height
-      const inputHeight = 56; // Input form height
 
       // Lock body height to prevent scrolling
-      document.body.style.height = viewport.height + "px";
-      document.body.style.overflow = "hidden";
-      
-      // The chat window is the wrapper
-      if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = 'fixed';
-        chatWindowRef.current.style.top = '0';
-        chatWindowRef.current.style.left = '0';
-        chatWindowRef.current.style.right = '0';
-        chatWindowRef.current.style.bottom = '0';
-        chatWindowRef.current.style.height = '100%';
-        chatWindowRef.current.style.overflow = 'hidden';
-      }
+      document.body.style.height = `${viewport.height}px`;
+      document.body.style.overflow = 'hidden'; // Ensure no body scroll
 
-      // Message container adjusts based on header and input
-      if (messageContainerRef.current) {
-        messageContainerRef.current.style.position = 'absolute';
-        messageContainerRef.current.style.top = `${headerHeight}px`;
-        messageContainerRef.current.style.left = '0';
-        messageContainerRef.current.style.right = '0';
-        messageContainerRef.current.style.bottom = `${inputHeight + keyboardHeight}px`;
-        messageContainerRef.current.style.height = 'auto';
-        messageContainerRef.current.style.overflowY = 'auto';
-        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = 'touch';
-      }
+      // Adjust only the message container height
+      const headerHeight = 48; // Header height
+      const inputHeight = 56; // Input form height
+      const totalStaticHeight = headerHeight + inputHeight;
+      messageContainerRef.current.style.height = `${viewport.height - totalStaticHeight}px`;
+      messageContainerRef.current.style.overflowY = 'auto';
 
-      // Form moves up with keyboard
+
+      // Move input field up when keyboard appears
       if (formRef.current) {
-        formRef.current.style.position = 'fixed';
+        formRef.current.style.position = 'fixed'; // Ensure fixed positioning
+        formRef.current.style.bottom = `${keyboardHeight}px`;
         formRef.current.style.left = '0';
         formRef.current.style.right = '0';
-        formRef.current.style.height = `${inputHeight}px`;
-        formRef.current.style.bottom = `${keyboardHeight}px`;
-        formRef.current.style.backgroundColor = '#000F00';
-        formRef.current.style.zIndex = '5';
+        formRef.current.style.backgroundColor = '#000F00'; // Keep background consistent
         if (isIOS) {
           formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
         }
@@ -122,60 +103,36 @@ const ChatInterface: React.FC = () => {
     };
 
     if (isMobile && isFullscreen) {
-      document.body.style.overscrollBehavior = 'none';
       window.visualViewport?.addEventListener('resize', adjustChatHeight);
       window.visualViewport?.addEventListener('scroll', adjustChatHeight);
+      adjustChatHeight(); // Initial adjustment
+
+      // Also adjust on orientation change
       window.addEventListener('orientationchange', adjustChatHeight);
-      setTimeout(adjustChatHeight, 50); // Initial adjustment with slight delay
-      
+
       return () => {
-        document.body.style.overscrollBehavior = '';
-        document.body.style.height = '';
-        document.body.style.overflow = '';
         window.visualViewport?.removeEventListener('resize', adjustChatHeight);
         window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
         window.removeEventListener('orientationchange', adjustChatHeight);
+        document.body.style.height = ''; // Reset body height on cleanup
+        document.body.style.overflow = ''; // Reset body overflow on cleanup
       };
     }
-    
+
     return undefined;
   }, [isMobile, isFullscreen]);
 
-  // Cleanup when fullscreen changes
+  // Cleanup when fullscreen changes - simplified, mostly handled in the effect above now
   useEffect(() => {
     if (!isFullscreen) {
-      document.body.style.height = '';
-      document.body.style.overflow = '';
-      document.body.style.overscrollBehavior = '';
-      
-      if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = '';
-        chatWindowRef.current.style.top = '';
-        chatWindowRef.current.style.left = '';
-        chatWindowRef.current.style.right = '';
-        chatWindowRef.current.style.bottom = '';
-        chatWindowRef.current.style.height = '';
-        chatWindowRef.current.style.overflow = '';
-      }
-      
-      if (messageContainerRef.current) {
-        messageContainerRef.current.style.position = '';
-        messageContainerRef.current.style.top = '';
-        messageContainerRef.current.style.left = '';
-        messageContainerRef.current.style.right = '';
-        messageContainerRef.current.style.bottom = '';
-        messageContainerRef.current.style.height = '';
-        messageContainerRef.current.style.overflowY = '';
-        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = '';
-      }
+      document.body.style.height = ''; // Reset body height when exiting fullscreen
+      document.body.style.overflow = ''; // Reset body overflow
 
       if (formRef.current) {
         formRef.current.style.position = '';
         formRef.current.style.bottom = '';
         formRef.current.style.left = '';
         formRef.current.style.right = '';
-        formRef.current.style.height = '';
-        formRef.current.style.zIndex = '';
         formRef.current.style.paddingBottom = '';
       }
     }
@@ -243,37 +200,24 @@ const ChatInterface: React.FC = () => {
   return (
     <>
       {currentUser && <NotificationFeed notifications={notifications} />}
-      <div 
+      <div
         ref={chatWindowRef}
         className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
-          isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'relative'
+          isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'relative chat-wrapper'
         }`}
         style={isFullscreen ? {
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: '100%',
-          margin: 0,
-          padding: 0,
+          height: '100dvh',
           overflow: 'hidden',
-          touchAction: 'none'
         } : {
           position: 'relative',
           overflow: 'hidden'
         }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-          isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-10' : ''
-        }`}
-        style={isFullscreen ? {
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10
-        } : {}}>
+          isFullscreen ? 'border-b border-neon-green/30' : ''
+        } header`}
+          style={isFullscreen ? { position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10 } : {}}
+        >
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
             <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -326,16 +270,17 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
         
-        <div className="terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative">
+        <div className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative chat-container`}
+          style={isFullscreen ? { paddingTop: '48px', overflow: 'hidden', height: '100%' } : {}}
+        >
           <div className="scan-line-effect pointer-events-none"></div>
           
           <div 
             ref={messageContainerRef}
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
-              position: 'relative',
               overflowY: 'auto',
-              overscrollBehavior: 'contain'
+              paddingBottom: '56px',
             }}
           >
             <MessageList 
@@ -377,9 +322,7 @@ const ChatInterface: React.FC = () => {
             <form 
               ref={formRef}
               onSubmit={handleSendMessage} 
-              className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
-                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
-              }`}
+              className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 input-container`}
               style={{
                 backgroundColor: '#000F00',
                 boxShadow: '0 -2px 10px rgba(0,0,0,0.3)',
@@ -388,7 +331,10 @@ const ChatInterface: React.FC = () => {
                   bottom: window.visualViewport?.height 
                     ? `${window.innerHeight - window.visualViewport.height}px` 
                     : '0',
-                  paddingBottom: 'env(safe-area-inset-bottom)'
+                  paddingBottom: 'env(safe-area-inset-bottom)',
+                  left: 0,
+                  right: 0,
+                  height: '56px'
                 } : {
                   position: 'absolute',
                   bottom: 0
