@@ -68,13 +68,16 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Enhanced viewport height management with dvh
+  // Enhanced viewport height management with dvh units
   useEffect(() => {
     const adjustChatHeight = () => {
       const viewport = window.visualViewport;
       if (!viewport || !isMobile || !isFullscreen) return;
 
-      // Set the chat window to use dvh
+      const keyboardHeight = window.innerHeight - viewport.height;
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+      // Set the main container height using dvh
       if (chatWindowRef.current) {
         chatWindowRef.current.style.position = 'fixed';
         chatWindowRef.current.style.top = '0';
@@ -84,22 +87,29 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.overflow = 'hidden';
       }
 
-      // Message container adjusts height based on dvh
+      // Message container adjusts height
       if (messageContainerRef.current) {
         const headerHeight = 48; // Header height
         const inputHeight = 56; // Input form height
-        messageContainerRef.current.style.height = `calc(100dvh - ${headerHeight}px - ${inputHeight}px)`;
+        const safeAreaBottom = isIOS ? 20 : 0; // Account for iOS safe area
+        const totalOffset = headerHeight + inputHeight + safeAreaBottom;
+        
+        if (keyboardHeight > 0) {
+          messageContainerRef.current.style.height = `${viewport.height - totalOffset}px`;
+        } else {
+          messageContainerRef.current.style.height = `calc(100dvh - ${totalOffset}px)`;
+        }
         messageContainerRef.current.style.overflowY = 'auto';
       }
 
-      // Form stays at the bottom
+      // Form moves up with keyboard
       if (formRef.current) {
         formRef.current.style.position = 'fixed';
         formRef.current.style.left = '0';
         formRef.current.style.right = '0';
-        formRef.current.style.bottom = '0';
+        formRef.current.style.bottom = `${keyboardHeight}px`;
         formRef.current.style.backgroundColor = '#000F00';
-        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        if (isIOS) {
           formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
         }
       }
@@ -107,10 +117,16 @@ const ChatInterface: React.FC = () => {
 
     if (isMobile && isFullscreen) {
       window.visualViewport?.addEventListener('resize', adjustChatHeight);
+      window.visualViewport?.addEventListener('scroll', adjustChatHeight);
       adjustChatHeight(); // Initial adjustment
+      
+      // Also adjust on orientation change
+      window.addEventListener('orientationchange', adjustChatHeight);
       
       return () => {
         window.visualViewport?.removeEventListener('resize', adjustChatHeight);
+        window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
+        window.removeEventListener('orientationchange', adjustChatHeight);
       };
     }
     
@@ -135,10 +151,10 @@ const ChatInterface: React.FC = () => {
       }
 
       if (formRef.current) {
-        formRef.current.style.position = 'absolute';
-        formRef.current.style.bottom = '0';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
+        formRef.current.style.position = '';
+        formRef.current.style.bottom = '';
+        formRef.current.style.left = '';
+        formRef.current.style.right = '';
         formRef.current.style.paddingBottom = '';
       }
     }
@@ -206,14 +222,25 @@ const ChatInterface: React.FC = () => {
   return (
     <>
       {currentUser && <NotificationFeed notifications={notifications} />}
-      <div
+      <div 
         ref={chatWindowRef}
-        className={`chat-window relative flex flex-col ${
-          isFullscreen ? 'fixed inset-0 bg-black' : 'h-full'
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+          isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'relative'
         }`}
-        style={{
-          height: isFullscreen ? '100dvh' : '100%',
-          maxHeight: isFullscreen ? '100dvh' : '100%'
+        style={isFullscreen ? {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: '100%',
+          margin: 0,
+          padding: 0,
+          overflow: 'hidden',
+          touchAction: 'none'
+        } : {
+          position: 'relative',
+          overflow: 'hidden'
         }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
