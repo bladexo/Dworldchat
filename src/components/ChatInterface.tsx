@@ -68,7 +68,7 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Enhanced viewport height management with dvh units
+  // Enhanced viewport height management with strict controls
   useEffect(() => {
     const adjustChatHeight = () => {
       const viewport = window.visualViewport;
@@ -77,78 +77,105 @@ const ChatInterface: React.FC = () => {
       const keyboardHeight = window.innerHeight - viewport.height;
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-      // Lock body scroll
+      // Strict body lock
+      document.documentElement.style.position = 'fixed';
+      document.documentElement.style.width = '100%';
+      document.documentElement.style.height = '100%';
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.touchAction = 'none';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
       document.body.style.height = '100%';
       document.body.style.overflow = 'hidden';
       document.body.style.touchAction = 'none';
+      document.body.style.overscrollBehavior = 'none';
 
-      // Set the main container height using dvh
+      // Set the main container height
       if (chatWindowRef.current) {
         const chatWindow = chatWindowRef.current;
         chatWindow.style.position = 'fixed';
         chatWindow.style.top = '0';
         chatWindow.style.left = '0';
         chatWindow.style.right = '0';
+        chatWindow.style.bottom = '0';
         chatWindow.style.height = `${viewport.height}px`;
         chatWindow.style.overflow = 'hidden';
         chatWindow.style.touchAction = 'none';
+        chatWindow.style.overscrollBehavior = 'none';
       }
 
-      // Message container adjusts height
+      // Message container adjusts height with strict controls
       if (messageContainerRef.current) {
         const messageContainer = messageContainerRef.current;
         const headerHeight = 48; // Header height
         const inputHeight = 56; // Input form height
-        const safeAreaBottom = isIOS ? 20 : 0; // Account for iOS safe area
+        const safeAreaBottom = isIOS ? 20 : 0;
         const totalOffset = headerHeight + inputHeight + safeAreaBottom;
         
         messageContainer.style.height = `${viewport.height - totalOffset}px`;
+        messageContainer.style.position = 'relative';
         messageContainer.style.overflowY = 'auto';
         messageContainer.style.touchAction = 'pan-y';
+        messageContainer.style.overscrollBehavior = 'contain';
       }
 
-      // Form moves up with keyboard
+      // Form positioning with transform
       if (formRef.current) {
-        formRef.current.style.position = 'fixed';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
-        formRef.current.style.bottom = '0';
-        formRef.current.style.transform = `translateY(-${keyboardHeight}px)`;
-        formRef.current.style.backgroundColor = '#000F00';
+        const form = formRef.current;
+        form.style.position = 'fixed';
+        form.style.left = '0';
+        form.style.right = '0';
+        form.style.bottom = '0';
+        form.style.transform = keyboardHeight > 0 ? `translateY(-${keyboardHeight}px)` : '';
+        form.style.backgroundColor = '#000F00';
+        form.style.zIndex = '50';
         if (isIOS) {
-          formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+          form.style.paddingBottom = keyboardHeight > 0 ? '0' : 'env(safe-area-inset-bottom)';
         }
       }
     };
 
     const preventScroll = (e: TouchEvent) => {
       if (e.target instanceof Element) {
-        // Allow scrolling only within message container
         if (!messageContainerRef.current?.contains(e.target)) {
           e.preventDefault();
         }
       }
     };
 
+    const preventBounce = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
     if (isMobile && isFullscreen) {
+      // Add all event listeners
       window.visualViewport?.addEventListener('resize', adjustChatHeight);
       window.visualViewport?.addEventListener('scroll', adjustChatHeight);
       document.addEventListener('touchmove', preventScroll, { passive: false });
-      adjustChatHeight(); // Initial adjustment
+      document.addEventListener('touchstart', preventBounce, { passive: false });
+      document.body.addEventListener('scroll', preventBounce, { passive: false });
+      adjustChatHeight();
       
       return () => {
+        // Remove all event listeners
         window.visualViewport?.removeEventListener('resize', adjustChatHeight);
         window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
         document.removeEventListener('touchmove', preventScroll);
+        document.removeEventListener('touchstart', preventBounce);
+        document.body.removeEventListener('scroll', preventBounce);
         
-        // Reset body styles
+        // Reset all styles
+        document.documentElement.style.position = '';
+        document.documentElement.style.width = '';
+        document.documentElement.style.height = '';
+        document.documentElement.style.overflow = '';
+        document.documentElement.style.touchAction = '';
         document.body.style.position = '';
         document.body.style.width = '';
         document.body.style.height = '';
         document.body.style.overflow = '';
         document.body.style.touchAction = '';
+        document.body.style.overscrollBehavior = '';
       };
     }
     
@@ -158,12 +185,20 @@ const ChatInterface: React.FC = () => {
   // Cleanup when fullscreen changes
   useEffect(() => {
     if (!isFullscreen) {
+      // Reset html styles
+      document.documentElement.style.position = '';
+      document.documentElement.style.width = '';
+      document.documentElement.style.height = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.touchAction = '';
+
       // Reset body styles
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.height = '';
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
+      document.body.style.overscrollBehavior = '';
 
       if (chatWindowRef.current) {
         const chatWindow = chatWindowRef.current;
@@ -171,25 +206,31 @@ const ChatInterface: React.FC = () => {
         chatWindow.style.top = '';
         chatWindow.style.left = '';
         chatWindow.style.right = '';
+        chatWindow.style.bottom = '';
         chatWindow.style.height = '';
         chatWindow.style.overflow = '';
         chatWindow.style.touchAction = '';
+        chatWindow.style.overscrollBehavior = '';
       }
       
       if (messageContainerRef.current) {
         const messageContainer = messageContainerRef.current;
         messageContainer.style.height = '';
+        messageContainer.style.position = '';
         messageContainer.style.overflowY = '';
         messageContainer.style.touchAction = '';
+        messageContainer.style.overscrollBehavior = '';
       }
 
       if (formRef.current) {
-        formRef.current.style.position = '';
-        formRef.current.style.bottom = '';
-        formRef.current.style.left = '';
-        formRef.current.style.right = '';
-        formRef.current.style.transform = '';
-        formRef.current.style.paddingBottom = '';
+        const form = formRef.current;
+        form.style.position = '';
+        form.style.bottom = '';
+        form.style.left = '';
+        form.style.right = '';
+        form.style.transform = '';
+        form.style.paddingBottom = '';
+        form.style.zIndex = '';
       }
     }
   }, [isFullscreen]);
