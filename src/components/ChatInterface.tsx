@@ -249,19 +249,18 @@ const ChatInterface: React.FC = () => {
         }}
       >
         <div 
-          className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center ${
-            isFullscreen ? 'h-12 border-b border-neon-green/30' : ''
+          className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
+            isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-20 sticky-header' : ''
           }`}
-          style={{
-            position: isFullscreen ? 'fixed' : 'relative',
+          style={isFullscreen ? {
+            position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
             zIndex: 20,
             backgroundColor: 'rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)'
-          }}
+            height: '48px'
+          } : undefined}
         >
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -316,11 +315,15 @@ const ChatInterface: React.FC = () => {
         </div>
         
         <div 
-          className="terminal-body bg-black flex flex-col flex-grow overflow-hidden relative"
-          style={{
-            marginTop: isFullscreen ? '48px' : '0',
-            height: isFullscreen ? 'calc(100% - 48px)' : '100%'
-          }}
+          className={`terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative ${
+            isFullscreen ? 'fullscreen-body' : ''
+          }`}
+          style={isFullscreen ? {
+            position: 'relative',
+            flex: '1 1 auto',
+            overflow: 'hidden',
+            marginTop: '48px'
+          } : undefined}
         >
           <div className="scan-line-effect pointer-events-none"></div>
           
@@ -329,15 +332,14 @@ const ChatInterface: React.FC = () => {
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
               position: 'absolute',
-              top: 0,
+              top: isFullscreen ? '48px' : '0',
               left: 0,
               right: 0,
               bottom: isFullscreen ? '56px' : '60px',
               overflowY: 'auto',
               overscrollBehavior: 'contain',
               touchAction: 'pan-y',
-              zIndex: 1,
-              willChange: 'transform'
+              zIndex: 1
             }}
           >
             <MessageList 
