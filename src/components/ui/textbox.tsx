@@ -9,11 +9,14 @@ export interface TextBoxProps extends React.InputHTMLAttributes<HTMLInputElement
 
 const TextBox = React.forwardRef<HTMLInputElement, TextBoxProps>(
   ({ className, type, error, label, helperText, ...props }, ref) => {
+    // Generate a random ID to prevent browser from recognizing the field
+    const randomId = `chat_msg_${Math.random().toString(36).substring(2)}`;
+    
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1" role="textbox">
         {/* Hidden input to prevent autofill */}
         <input 
-          type="search" 
+          type="text" 
           style={{ display: 'none' }} 
           name="hidden" 
           autoComplete="new-off"
@@ -24,7 +27,9 @@ const TextBox = React.forwardRef<HTMLInputElement, TextBoxProps>(
           </label>
         )}
         <input
-          type={type}
+          type="search" // Using search prevents password manager triggering
+          role="textbox"
+          aria-label="Chat message"
           className={cn(
             "flex h-10 w-full rounded-md border font-mono bg-black/40 px-3 py-2 text-sm transition-colors",
             "text-white placeholder:text-white/30",
@@ -34,12 +39,11 @@ const TextBox = React.forwardRef<HTMLInputElement, TextBoxProps>(
             error && "border-red-500/50 focus:border-red-500 focus:ring-red-500/20",
             className
           )}
-          autoComplete="new-off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck="false"
+          id={randomId}
+          name={randomId}
+          autoComplete="off"
+          data-lpignore="true" // Prevents LastPass from detecting as password field
           data-form-type="other"
-          role="presentation"
           ref={ref}
           {...props}
         />
