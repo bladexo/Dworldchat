@@ -399,11 +399,11 @@ const ChatInterface: React.FC = () => {
                     }
                   }}
                   placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none min-h-[20px] py-1.5 pb-2"
+                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none h-[20px] py-1.5 pb-2"
                 />
                 <Button 
                   onClick={handleSendMessage}
-                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0"
+                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0 h-[25px]"
                   disabled={!messageInput.trim()}
                 >
                   <Send className="h-3 w-3 sm:h-4 sm:w-4" />
