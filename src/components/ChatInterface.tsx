@@ -10,8 +10,7 @@ import TypingIndicator from './TypingIndicator';
 import { soundManager } from '@/utils/sound';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFullscreen } from '@/hooks/use-fullscreen';
-import { TextBox } from '@/components/ui/textbox';
-import { ContentEditable } from '@/components/ui/content-editable';
+import { Textarea } from '@/components/ui/textarea';
 
 const ChatInterface: React.FC = () => {
   const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
@@ -19,7 +18,7 @@ const ChatInterface: React.FC = () => {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const inputRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
@@ -386,12 +385,12 @@ const ChatInterface: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-1 sm:gap-2">
-                <ContentEditable
+                <Textarea
                   ref={inputRef}
                   value={messageInput}
-                  onChange={(value) => {
-                    setMessageInput(value);
-                    handleInputChange(value);
+                  onChange={(e) => {
+                    setMessageInput(e.target.value);
+                    handleInputChange(e.target.value);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -400,7 +399,7 @@ const ChatInterface: React.FC = () => {
                     }
                   }}
                   placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
+                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none"
                 />
                 <Button 
                   onClick={handleSendMessage}
