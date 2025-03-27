@@ -160,15 +160,12 @@ const ChatInterface: React.FC = () => {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSendMessage(e as unknown as React.FormEvent);
+      handleSendMessage();
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSendMessage = async () => {
     if (messageInput.trim()) {
-      // Simple send without any focus or scroll manipulation
       await sendMessage(messageInput, replyingTo);
       if (soundEnabled) {
         soundManager.playMessageSound();
@@ -398,7 +395,7 @@ const ChatInterface: React.FC = () => {
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
-                  onClick={(e) => handleSendMessage(e)}
+                  onClick={handleSendMessage}
                   className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0"
                   disabled={!messageInput.trim()}
                 >
