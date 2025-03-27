@@ -84,8 +84,6 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.right = '0';
         chatWindowRef.current.style.bottom = '0';
         chatWindowRef.current.style.overflow = 'hidden';
-        chatWindowRef.current.style.height = '100%';
-        chatWindowRef.current.style.width = '100%';
       }
 
       // Message container adjusts height
@@ -104,7 +102,6 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.right = '0';
         formRef.current.style.bottom = `${keyboardHeight}px`;
         formRef.current.style.backgroundColor = '#000F00';
-        formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
       }
     };
 
@@ -132,8 +129,6 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.right = '';
         chatWindowRef.current.style.bottom = '';
         chatWindowRef.current.style.overflow = '';
-        chatWindowRef.current.style.height = '';
-        chatWindowRef.current.style.width = '';
       }
       
       if (messageContainerRef.current) {
@@ -142,11 +137,10 @@ const ChatInterface: React.FC = () => {
       }
 
       if (formRef.current) {
-        formRef.current.style.position = 'absolute';
-        formRef.current.style.bottom = '0';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
-        formRef.current.style.paddingBottom = '';
+        formRef.current.style.position = '';
+        formRef.current.style.bottom = '';
+        formRef.current.style.left = '';
+        formRef.current.style.right = '';
       }
     }
   }, [isFullscreen]);
@@ -199,6 +193,12 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  const handleFullscreenToggle = () => {
+    if (chatWindowRef.current) {
+      toggleFullscreen();
+    }
+  };
+
   const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
     soundManager.toggleSound(!soundEnabled);
@@ -209,9 +209,24 @@ const ChatInterface: React.FC = () => {
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
         ref={chatWindowRef}
-        className={`chat-window relative flex flex-col bg-black/90 text-neon-green font-mono text-sm sm:text-base ${
-          isFullscreen ? 'fixed inset-0 z-50' : 'h-[600px] w-full rounded-lg border border-neon-green/30'
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+          isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'relative'
         }`}
+        style={isFullscreen ? {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: '100%',
+          margin: 0,
+          padding: 0,
+          overflow: 'hidden',
+          touchAction: 'none'
+        } : {
+          position: 'relative',
+          overflow: 'hidden'
+        }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
           isFullscreen ? 'border-b border-neon-green/30' : ''
@@ -247,7 +262,7 @@ const ChatInterface: React.FC = () => {
               )}
             </Button>
             <Button
-              onClick={toggleFullscreen}
+              onClick={handleFullscreenToggle}
               className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
             >
               {isFullscreen ? (
