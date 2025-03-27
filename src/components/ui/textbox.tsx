@@ -13,7 +13,7 @@ const TextBox = React.forwardRef<HTMLInputElement, TextBoxProps>(
       <div className="flex flex-col gap-1">
         {/* Hidden input to prevent autofill */}
         <input 
-          type="text" 
+          type="search" 
           style={{ display: 'none' }} 
           name="hidden" 
           autoComplete="new-off"
