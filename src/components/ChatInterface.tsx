@@ -79,17 +79,27 @@ const ChatInterface: React.FC = () => {
 
       if (!isIOS) return; // Only apply these changes for iOS
 
-      // Set the main container styles
+      // Set the main container height using dvh
       if (chatWindowRef.current) {
         chatWindowRef.current.style.position = 'fixed';
         chatWindowRef.current.style.top = '0';
         chatWindowRef.current.style.left = '0';
         chatWindowRef.current.style.right = '0';
+        chatWindowRef.current.style.height = '100dvh';
         chatWindowRef.current.style.overflow = 'hidden';
-        // Remove height setting to prevent container resizing
+        chatWindowRef.current.style.display = 'flex';
+        chatWindowRef.current.style.flexDirection = 'column';
       }
 
-      // Header is now handled by inline styles
+      // Header stays fixed at top
+      const header = chatWindowRef.current?.querySelector('.terminal-header');
+      if (header) {
+        (header as HTMLElement).style.position = 'fixed';
+        (header as HTMLElement).style.top = '0';
+        (header as HTMLElement).style.left = '0';
+        (header as HTMLElement).style.right = '0';
+        (header as HTMLElement).style.zIndex = '100';
+      }
 
       // Message container adjusts height
       if (messageContainerRef.current) {
@@ -97,14 +107,23 @@ const ChatInterface: React.FC = () => {
         const inputHeight = 56; // Input form height
         const safeAreaBottom = 20; // iOS safe area
         
-        messageContainerRef.current.style.position = 'fixed';
-        messageContainerRef.current.style.top = `${headerHeight}px`;
-        messageContainerRef.current.style.left = '0';
-        messageContainerRef.current.style.right = '0';
-        messageContainerRef.current.style.bottom = `${inputHeight + (keyboardHeight > 0 ? keyboardHeight : 0) + safeAreaBottom}px`;
-        messageContainerRef.current.style.overflowY = 'auto';
-        messageContainerRef.current.style.overflowX = 'hidden';
-        messageContainerRef.current.style.backgroundColor = '#001100';
+        if (keyboardHeight > 0) {
+          messageContainerRef.current.style.position = 'fixed';
+          messageContainerRef.current.style.top = `${headerHeight}px`;
+          messageContainerRef.current.style.left = '0';
+          messageContainerRef.current.style.right = '0';
+          messageContainerRef.current.style.bottom = `${inputHeight + keyboardHeight + safeAreaBottom}px`;
+          messageContainerRef.current.style.overflowY = 'auto';
+          messageContainerRef.current.style.overflowX = 'hidden';
+        } else {
+          messageContainerRef.current.style.position = 'fixed';
+          messageContainerRef.current.style.top = `${headerHeight}px`;
+          messageContainerRef.current.style.left = '0';
+          messageContainerRef.current.style.right = '0';
+          messageContainerRef.current.style.bottom = `${inputHeight + safeAreaBottom}px`;
+          messageContainerRef.current.style.overflowY = 'auto';
+          messageContainerRef.current.style.overflowX = 'hidden';
+        }
       }
 
       // Form moves up with keyboard
@@ -114,7 +133,7 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.right = '0';
         formRef.current.style.bottom = `${keyboardHeight}px`;
         formRef.current.style.backgroundColor = '#000F00';
-        formRef.current.style.zIndex = '99';
+        formRef.current.style.zIndex = '100';
         formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
       }
     };
@@ -247,92 +266,92 @@ const ChatInterface: React.FC = () => {
     <>
       {currentUser && <NotificationFeed notifications={notifications} />}
       <div 
+        className={`terminal-header fixed top-0 left-0 right-0 bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 z-[200] ${
+          isFullscreen ? 'border-b border-neon-green/30' : ''
+        }`}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '48px', // Fixed header height
+          zIndex: 200,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)'
+        }}
+      >
+        <div className="flex items-center">
+          <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
+          <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
+          <div className="header-button bg-green-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
+          <span className="ml-2 sm:ml-4 font-mono text-[10px] sm:text-xs md:text-sm flex items-center text-neon-green">
+            <Terminal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> GLOBAL_CHAT
+          </span>
+        </div>
+        <div className="flex items-center gap-1 sm:gap-3">
+          {isConnected ? (
+            <div className="flex items-center gap-1 text-neon-green">
+              <Wifi className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
+              <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">CONNECTED</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-red-500">
+              <WifiOff className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
+            </div>
+          )}
+          <Button
+            onClick={toggleSound}
+            className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
+          >
+            {soundEnabled ? (
+              <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
+            ) : (
+              <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
+            )}
+          </Button>
+          <Button
+            onClick={handleFullscreenToggle}
+            className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
+          >
+            {isFullscreen ? (
+              <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
+            ) : (
+              <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
+            )}
+          </Button>
+          {currentUser && (
+            <UsernameBadge 
+              username={currentUser.username} 
+              color={currentUser.color}
+              showIcon 
+              className="mr-2 sm:mr-3 scale-75 sm:scale-90 md:scale-100"
+            />
+          )}
+          <OnlineCounter count={onlineUsers} />
+        </div>
+      </div>
+
+      <div 
         ref={chatWindowRef}
         className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
           isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'relative'
         }`}
         style={isFullscreen ? {
           position: 'fixed',
-          top: 0,
+          top: '48px', // Start below fixed header
           left: 0,
           right: 0,
           bottom: 0,
+          height: 'calc(100% - 48px)', // Adjust height to account for header
           margin: 0,
           padding: 0,
           overflow: 'hidden',
-          touchAction: 'none',
-          ...(!/iPad|iPhone|iPod/.test(navigator.userAgent) && { height: '100%' })
+          touchAction: 'none'
         } : {
           position: 'relative',
           overflow: 'hidden'
         }}
       >
-        <div 
-          className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-            isFullscreen ? 'border-b border-neon-green/30' : ''
-          }`}
-          style={isFullscreen && /iPad|iPhone|iPod/.test(navigator.userAgent) ? {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            backdropFilter: 'blur(10px)'
-          } : undefined}
-        >
-          <div className="flex items-center">
-            <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <div className="header-button bg-green-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <span className="ml-2 sm:ml-4 font-mono text-[10px] sm:text-xs md:text-sm flex items-center text-neon-green">
-              <Terminal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> GLOBAL_CHAT
-            </span>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-3">
-            {isConnected ? (
-              <div className="flex items-center gap-1 text-neon-green">
-                <Wifi className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
-                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">CONNECTED</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-red-500">
-                <WifiOff className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
-              </div>
-            )}
-            <Button
-              onClick={toggleSound}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-            >
-              {soundEnabled ? (
-                <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-            </Button>
-            <Button
-              onClick={handleFullscreenToggle}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-            >
-              {isFullscreen ? (
-                <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-            </Button>
-            {currentUser && (
-              <UsernameBadge 
-                username={currentUser.username} 
-                color={currentUser.color}
-                showIcon 
-                className="mr-2 sm:mr-3 scale-75 sm:scale-90 md:scale-100"
-              />
-            )}
-            <OnlineCounter count={onlineUsers} />
-          </div>
-        </div>
-        
         <div className="terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative">
           <div className="scan-line-effect pointer-events-none"></div>
           
