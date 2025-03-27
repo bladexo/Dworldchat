@@ -79,51 +79,12 @@ const ChatInterface: React.FC = () => {
 
       if (!isIOS) return; // Only apply these changes for iOS
 
-      // Set the main container height using dvh
-      if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = 'fixed';
-        chatWindowRef.current.style.top = '0';
-        chatWindowRef.current.style.left = '0';
-        chatWindowRef.current.style.right = '0';
-        chatWindowRef.current.style.height = '100dvh';
-        chatWindowRef.current.style.overflow = 'hidden';
-        chatWindowRef.current.style.display = 'flex';
-        chatWindowRef.current.style.flexDirection = 'column';
-      }
-
-      // Header stays fixed at top
-      const header = chatWindowRef.current?.querySelector('.terminal-header');
-      if (header) {
-        (header as HTMLElement).style.position = 'fixed';
-        (header as HTMLElement).style.top = '0';
-        (header as HTMLElement).style.left = '0';
-        (header as HTMLElement).style.right = '0';
-        (header as HTMLElement).style.zIndex = '100';
-      }
-
       // Message container adjusts height
       if (messageContainerRef.current) {
-        const headerHeight = 48; // Header height
         const inputHeight = 56; // Input form height
-        const safeAreaBottom = 20; // iOS safe area
-        
-        if (keyboardHeight > 0) {
-          messageContainerRef.current.style.position = 'fixed';
-          messageContainerRef.current.style.top = `${headerHeight}px`;
-          messageContainerRef.current.style.left = '0';
-          messageContainerRef.current.style.right = '0';
-          messageContainerRef.current.style.bottom = `${inputHeight + keyboardHeight + safeAreaBottom}px`;
-          messageContainerRef.current.style.overflowY = 'auto';
-          messageContainerRef.current.style.overflowX = 'hidden';
-        } else {
-          messageContainerRef.current.style.position = 'fixed';
-          messageContainerRef.current.style.top = `${headerHeight}px`;
-          messageContainerRef.current.style.left = '0';
-          messageContainerRef.current.style.right = '0';
-          messageContainerRef.current.style.bottom = `${inputHeight + safeAreaBottom}px`;
-          messageContainerRef.current.style.overflowY = 'auto';
-          messageContainerRef.current.style.overflowX = 'hidden';
-        }
+        messageContainerRef.current.style.bottom = `${inputHeight}px`;
+        messageContainerRef.current.style.overflowY = 'auto';
+        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = 'touch';
       }
 
       // Form moves up with keyboard
@@ -135,7 +96,13 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.backgroundColor = '#000F00';
         formRef.current.style.zIndex = '100';
         formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+        formRef.current.style.webkitTransform = 'translate3d(0,0,0)';
       }
+
+      // Prevent body scroll
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
     };
 
     if (isMobile && isFullscreen) {
@@ -150,6 +117,13 @@ const ChatInterface: React.FC = () => {
         window.visualViewport?.removeEventListener('resize', adjustChatHeight);
         window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
         window.removeEventListener('orientationchange', adjustChatHeight);
+        
+        // Reset body position
+        const scrollY = document.body.style.top;
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.top = '';
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
       };
     }
     
@@ -162,26 +136,6 @@ const ChatInterface: React.FC = () => {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       if (!isIOS) return;
 
-      if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = '';
-        chatWindowRef.current.style.top = '';
-        chatWindowRef.current.style.left = '';
-        chatWindowRef.current.style.right = '';
-        chatWindowRef.current.style.height = '';
-        chatWindowRef.current.style.overflow = '';
-        chatWindowRef.current.style.display = '';
-        chatWindowRef.current.style.flexDirection = '';
-      }
-
-      const header = chatWindowRef.current?.querySelector('.terminal-header');
-      if (header) {
-        (header as HTMLElement).style.position = '';
-        (header as HTMLElement).style.top = '';
-        (header as HTMLElement).style.left = '';
-        (header as HTMLElement).style.right = '';
-        (header as HTMLElement).style.zIndex = '';
-      }
-      
       if (messageContainerRef.current) {
         messageContainerRef.current.style.position = '';
         messageContainerRef.current.style.top = '';
@@ -189,7 +143,7 @@ const ChatInterface: React.FC = () => {
         messageContainerRef.current.style.right = '';
         messageContainerRef.current.style.bottom = '';
         messageContainerRef.current.style.overflowY = '';
-        messageContainerRef.current.style.overflowX = '';
+        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = '';
       }
 
       if (formRef.current) {
@@ -199,7 +153,15 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.right = '';
         formRef.current.style.paddingBottom = '';
         formRef.current.style.zIndex = '';
+        formRef.current.style.webkitTransform = '';
       }
+
+      // Reset body position
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
     }
   }, [isFullscreen]);
 
@@ -265,153 +227,92 @@ const ChatInterface: React.FC = () => {
   return (
     <>
       {currentUser && <NotificationFeed notifications={notifications} />}
-      {/* Header moved outside main container for iOS */}
-      {isFullscreen && isMobile && /iPad|iPhone|iPod/.test(navigator.userAgent) && (
-        <div 
-          className="terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 border-b border-neon-green/30"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '48px',
-            zIndex: 1000,
-            backgroundColor: '#001100'
-          }}
-        >
-          <div className="flex items-center">
-            <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <div className="header-button bg-green-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-            <span className="ml-2 sm:ml-4 font-mono text-[10px] sm:text-xs md:text-sm flex items-center text-neon-green">
-              <Terminal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> GLOBAL_CHAT
-            </span>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-3">
-            {isConnected ? (
-              <div className="flex items-center gap-1 text-neon-green">
-                <Wifi className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
-                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">CONNECTED</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-red-500">
-                <WifiOff className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
-              </div>
-            )}
-            <Button
-              onClick={toggleSound}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-            >
-              {soundEnabled ? (
-                <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-            </Button>
-            <Button
-              onClick={handleFullscreenToggle}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-            >
-              {isFullscreen ? (
-                <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-            </Button>
-            {currentUser && (
-              <UsernameBadge 
-                username={currentUser.username} 
-                color={currentUser.color}
-                showIcon 
-                className="mr-2 sm:mr-3 scale-75 sm:scale-90 md:scale-100"
-              />
-            )}
-            <OnlineCounter count={onlineUsers} />
-          </div>
+      <div 
+        className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
+          isFullscreen ? 'fixed top-0 left-0 right-0 border-b border-neon-green/30 z-[200] transform-gpu' : ''
+        }`}
+        style={isFullscreen ? {
+          WebkitTransform: 'translate3d(0,0,0)',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 200
+        } : undefined}
+      >
+        <div className="flex items-center">
+          <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
+          <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
+          <div className="header-button bg-green-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
+          <span className="ml-2 sm:ml-4 font-mono text-[10px] sm:text-xs md:text-sm flex items-center text-neon-green">
+            <Terminal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> GLOBAL_CHAT
+          </span>
         </div>
-      )}
+        <div className="flex items-center gap-1 sm:gap-3">
+          {isConnected ? (
+            <div className="flex items-center gap-1 text-neon-green">
+              <Wifi className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
+              <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">CONNECTED</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-red-500">
+              <WifiOff className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
+            </div>
+          )}
+          <Button
+            onClick={toggleSound}
+            className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
+          >
+            {soundEnabled ? (
+              <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
+            ) : (
+              <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
+            )}
+          </Button>
+          <Button
+            onClick={handleFullscreenToggle}
+            className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
+          >
+            {isFullscreen ? (
+              <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
+            ) : (
+              <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
+            )}
+          </Button>
+          {currentUser && (
+            <UsernameBadge 
+              username={currentUser.username} 
+              color={currentUser.color}
+              showIcon 
+              className="mr-2 sm:mr-3 scale-75 sm:scale-90 md:scale-100"
+            />
+          )}
+          <OnlineCounter count={onlineUsers} />
+        </div>
+      </div>
+      
       <div 
         ref={chatWindowRef}
-        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden flex flex-col ${
+        className={`terminal-window w-full max-w-4xl min-w-[320px] h-[80vh] mx-auto my-0 bg-[#001100] border border-neon-green/30 rounded-lg overflow-hidden ${
           isFullscreen ? 'fixed inset-0 max-w-none !m-0 !p-0 rounded-none z-[99] border-none' : 'relative'
         }`}
-        style={{
-          ...(isFullscreen ? {
-            position: /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'absolute' : 'fixed',
-            top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '48px' : '0',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'calc(100% - 48px)' : '100%',
-            margin: 0,
-            padding: 0,
-            overflow: 'hidden',
-            touchAction: 'none'
-          } : {
-            position: 'relative',
-            overflow: 'hidden'
-          })
+        style={isFullscreen ? {
+          position: 'fixed',
+          top: '48px', // Header height
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 'auto',
+          margin: 0,
+          padding: 0,
+          overflow: 'hidden',
+          touchAction: 'none'
+        } : {
+          position: 'relative',
+          overflow: 'hidden'
         }}
       >
-        {/* Only show header inside container for non-iOS or non-fullscreen */}
-        {(!isMobile || !isFullscreen || !/iPad|iPhone|iPod/.test(navigator.userAgent)) && (
-          <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-            isFullscreen ? 'border-b border-neon-green/30' : ''
-          }`}>
-            <div className="flex items-center">
-              <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-              <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-              <div className="header-button bg-green-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
-              <span className="ml-2 sm:ml-4 font-mono text-[10px] sm:text-xs md:text-sm flex items-center text-neon-green">
-                <Terminal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> GLOBAL_CHAT
-              </span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-3">
-              {isConnected ? (
-                <div className="flex items-center gap-1 text-neon-green">
-                  <Wifi className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
-                  <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">CONNECTED</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 text-red-500">
-                  <WifiOff className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
-                </div>
-              )}
-              <Button
-                onClick={toggleSound}
-                className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-              >
-                {soundEnabled ? (
-                  <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                ) : (
-                  <VolumeX className="h-3 w-3 sm:h-4 sm:w-4" />
-                )}
-              </Button>
-              <Button
-                onClick={handleFullscreenToggle}
-                className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
-              >
-                {isFullscreen ? (
-                  <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
-                ) : (
-                  <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
-                )}
-              </Button>
-              {currentUser && (
-                <UsernameBadge 
-                  username={currentUser.username} 
-                  color={currentUser.color}
-                  showIcon 
-                  className="mr-2 sm:mr-3 scale-75 sm:scale-90 md:scale-100"
-                />
-              )}
-              <OnlineCounter count={onlineUsers} />
-            </div>
-          </div>
-        )}
-        
         <div className="terminal-body bg-black p-0 flex flex-col flex-grow overflow-hidden relative">
           <div className="scan-line-effect pointer-events-none"></div>
           
@@ -419,9 +320,14 @@ const ChatInterface: React.FC = () => {
             ref={messageContainerRef}
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
-              position: 'relative',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: '56px',
               overflowY: 'auto',
-              overscrollBehavior: 'contain'
+              overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch'
             }}
           >
             <MessageList 
