@@ -9,7 +9,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     
     return (
       <input
-        type="search"
+        type="text"
         role="textbox"
         aria-label="Text input"
         id={randomId}
