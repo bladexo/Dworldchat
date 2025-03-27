@@ -82,6 +82,18 @@ const ChatInterface: React.FC = () => {
       const inputHeight = 56;
       const safeAreaBottom = 20;
 
+      // Lock entire page
+      document.documentElement.style.position = 'fixed';
+      document.documentElement.style.width = '100%';
+      document.documentElement.style.height = '100%';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+      document.body.style.overscrollBehavior = 'none';
+
       // 1. Header - Always fixed at top
       const header = chatWindowRef.current?.querySelector('.terminal-header') as HTMLElement;
       if (header) {
@@ -91,9 +103,10 @@ const ChatInterface: React.FC = () => {
           left: '0',
           right: '0',
           zIndex: '1000',
-          transform: 'translateZ(0)', // Hardware acceleration
+          transform: 'translateZ(0)',
           willChange: 'transform',
-          backgroundColor: '#001100'
+          backgroundColor: '#001100',
+          touchAction: 'none'
         });
       }
 
@@ -108,10 +121,11 @@ const ChatInterface: React.FC = () => {
           overflowY: 'auto',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
-          transform: 'translateZ(0)', // Hardware acceleration
+          transform: 'translateZ(0)',
           willChange: 'transform, height',
           touchAction: 'pan-y',
-          zIndex: '1'
+          zIndex: '1',
+          overscrollBehavior: 'contain'
         });
       }
 
@@ -124,9 +138,10 @@ const ChatInterface: React.FC = () => {
           bottom: `${keyboardHeight}px`,
           paddingBottom: 'env(safe-area-inset-bottom)',
           backgroundColor: '#000F00',
-          transform: 'translateZ(0)', // Hardware acceleration
+          transform: 'translateZ(0)',
           willChange: 'transform',
-          zIndex: '999'
+          zIndex: '999',
+          touchAction: 'none'
         });
       }
 
@@ -139,12 +154,10 @@ const ChatInterface: React.FC = () => {
           right: '0',
           height: '100%',
           overflow: 'hidden',
-          touchAction: 'none'
+          touchAction: 'none',
+          overscrollBehavior: 'none',
+          transform: 'translateZ(0)'
         });
-
-        // Prevent body scrolling
-        document.body.style.overflow = 'hidden';
-        document.body.style.touchAction = 'none';
       }
     };
 
@@ -157,11 +170,20 @@ const ChatInterface: React.FC = () => {
       window.visualViewport?.addEventListener('scroll', adjustLayout);
       window.addEventListener('orientationchange', adjustLayout);
 
+      // Prevent any touch events that might cause scrolling
+      const preventScroll = (e: TouchEvent) => {
+        if (e.target !== messageContainerRef.current) {
+          e.preventDefault();
+        }
+      };
+      document.addEventListener('touchmove', preventScroll, { passive: false });
+
       // Cleanup
       return () => {
         window.visualViewport?.removeEventListener('resize', adjustLayout);
         window.visualViewport?.removeEventListener('scroll', adjustLayout);
         window.removeEventListener('orientationchange', adjustLayout);
+        document.removeEventListener('touchmove', preventScroll);
       };
     }
   }, [isMobile, isFullscreen]);
@@ -171,6 +193,18 @@ const ChatInterface: React.FC = () => {
     if (!isFullscreen) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       if (!isIOS) return;
+
+      // Reset html and body
+      document.documentElement.style.position = '';
+      document.documentElement.style.width = '';
+      document.documentElement.style.height = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+      document.body.style.overscrollBehavior = '';
 
       // Reset header styles
       const header = chatWindowRef.current?.querySelector('.terminal-header') as HTMLElement;
@@ -183,7 +217,8 @@ const ChatInterface: React.FC = () => {
           zIndex: '',
           transform: '',
           willChange: '',
-          backgroundColor: ''
+          backgroundColor: '',
+          touchAction: ''
         });
       }
 
@@ -201,7 +236,8 @@ const ChatInterface: React.FC = () => {
           transform: '',
           willChange: '',
           touchAction: '',
-          zIndex: ''
+          zIndex: '',
+          overscrollBehavior: ''
         });
       }
 
@@ -216,11 +252,12 @@ const ChatInterface: React.FC = () => {
           backgroundColor: '',
           transform: '',
           willChange: '',
-          zIndex: ''
+          zIndex: '',
+          touchAction: ''
         });
       }
 
-      // Reset main container and body styles
+      // Reset main container styles
       if (chatWindowRef.current) {
         Object.assign(chatWindowRef.current.style, {
           position: '',
@@ -229,11 +266,10 @@ const ChatInterface: React.FC = () => {
           right: '',
           height: '',
           overflow: '',
-          touchAction: ''
+          touchAction: '',
+          overscrollBehavior: '',
+          transform: ''
         });
-
-        document.body.style.overflow = '';
-        document.body.style.touchAction = '';
       }
     }
   }, [isFullscreen]);
