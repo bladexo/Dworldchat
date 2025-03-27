@@ -11,6 +11,7 @@ import { soundManager } from '@/utils/sound';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFullscreen } from '@/hooks/use-fullscreen';
 import { TextBox } from '@/components/ui/textbox';
+import { ContentEditable } from '@/components/ui/content-editable';
 
 const ChatInterface: React.FC = () => {
   const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
@@ -385,15 +386,12 @@ const ChatInterface: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-1 sm:gap-2">
-                <div 
+                <ContentEditable
                   ref={inputRef}
-                  contentEditable
-                  className="flex min-h-[40px] w-full rounded-md border font-mono bg-black/40 px-3 py-2 text-sm transition-colors text-white border-white/20 focus:border-white/50 focus:outline-none focus:ring-2 focus:ring-white/10 placeholder-white/30 min-w-0 empty:before:content-[attr(data-placeholder)] empty:before:text-white/30"
-                  data-placeholder="Type your message..."
-                  onInput={(e) => {
-                    const content = e.currentTarget.textContent || '';
-                    setMessageInput(content);
-                    handleInputChange(content);
+                  value={messageInput}
+                  onChange={(value) => {
+                    setMessageInput(value);
+                    handleInputChange(value);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -401,6 +399,8 @@ const ChatInterface: React.FC = () => {
                       handleSendMessage();
                     }
                   }}
+                  placeholder="Type your message..."
+                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
                   onClick={handleSendMessage}
