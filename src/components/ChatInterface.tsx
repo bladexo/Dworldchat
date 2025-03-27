@@ -23,7 +23,7 @@ const ChatInterface: React.FC = () => {
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -349,9 +349,9 @@ const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            <form 
+            <div 
               ref={formRef}
-              onSubmit={handleSendMessage} 
+              role="presentation"
               className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
                 isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
@@ -398,7 +398,7 @@ const ChatInterface: React.FC = () => {
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
-                  type="submit" 
+                  onClick={(e) => handleSendMessage(e)}
                   className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0"
                   disabled={!messageInput.trim()}
                 >
@@ -406,7 +406,7 @@ const ChatInterface: React.FC = () => {
                   <span className="sr-only">Send</span>
                 </Button>
               </div>
-            </form>
+            </div>
           )}
         </div>
       </div>
