@@ -12,9 +12,10 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       <input
         type={type || "text"}
         id={randomName}
-        name={randomName}
+        name="bhfgkbyu65tgy"
         autoComplete="chrome-off" // Special value to prevent Chrome autofill
         data-lpignore="true"
+        inputMode="text"
         data-form-type="other"
         translate="no" // Prevents browser from translating/analyzing content
         className={cn(
