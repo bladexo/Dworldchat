@@ -23,7 +23,7 @@ const ChatInterface: React.FC = () => {
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLDivElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -102,14 +102,14 @@ const ChatInterface: React.FC = () => {
         }
 
         // Form moves up with keyboard
-        if (formRef.current) {
-          formRef.current.style.position = 'fixed';
-          formRef.current.style.left = '0';
-          formRef.current.style.right = '0';
-          formRef.current.style.bottom = `${keyboardHeight}px`;
-          formRef.current.style.backgroundColor = '#000F00';
+        if (inputContainerRef.current) {
+          inputContainerRef.current.style.position = 'fixed';
+          inputContainerRef.current.style.left = '0';
+          inputContainerRef.current.style.right = '0';
+          inputContainerRef.current.style.bottom = `${keyboardHeight}px`;
+          inputContainerRef.current.style.backgroundColor = '#000F00';
           if (isIOS) {
-            formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+            inputContainerRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
           }
         }
       }, 50);
@@ -147,12 +147,12 @@ const ChatInterface: React.FC = () => {
         messageContainerRef.current.style.paddingBottom = '60px';
       }
 
-      if (formRef.current) {
-        formRef.current.style.position = 'absolute';
-        formRef.current.style.bottom = '0';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
-        formRef.current.style.paddingBottom = '4px';
+      if (inputContainerRef.current) {
+        inputContainerRef.current.style.position = 'absolute';
+        inputContainerRef.current.style.bottom = '0';
+        inputContainerRef.current.style.left = '0';
+        inputContainerRef.current.style.right = '0';
+        inputContainerRef.current.style.paddingBottom = '4px';
       }
     }
   }, [isFullscreen]);
@@ -347,9 +347,9 @@ const ChatInterface: React.FC = () => {
             </div>
           ) : (
             <div 
-              ref={formRef}
+              ref={inputContainerRef}
               role="presentation"
-              className={`flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
+              className={`message-input flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
                 isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
               style={{
@@ -387,7 +387,6 @@ const ChatInterface: React.FC = () => {
               )}
               <div className="flex gap-1 sm:gap-2">
                 <Input
-                  type="text"
                   ref={inputRef}
                   value={messageInput}
                   onChange={handleMessageInput}
