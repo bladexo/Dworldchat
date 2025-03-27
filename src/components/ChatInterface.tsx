@@ -11,6 +11,8 @@ import TypingIndicator from './TypingIndicator';
 import { soundManager } from '@/utils/sound';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFullscreen } from '@/hooks/use-fullscreen';
+import IOSFullscreenChat from './IOSFullscreenChat';
+import { Message } from '../types/Message';
 
 const ChatInterface: React.FC = () => {
   const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
@@ -152,22 +154,30 @@ const ChatInterface: React.FC = () => {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSendMessage(e as unknown as React.FormEvent);
+      if (!inputRef.current?.value.trim()) return;
+      handleSendMessage(inputRef.current.value);
+      inputRef.current.value = '';
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleMessageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inputRef.current?.value.trim()) return;
     
-    if (messageInput.trim()) {
-      // Simple send without any focus or scroll manipulation
-      await sendMessage(messageInput, replyingTo);
-      if (soundEnabled) {
-        soundManager.playMessageSound();
-      }
-      setMessageInput('');
-      setReplyingTo(null);
+    const message = inputRef.current.value;
+    await handleSendMessage(message);
+    inputRef.current.value = '';
+  };
+
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return;
+    
+    await sendMessage(message, replyingTo);
+    if (soundEnabled) {
+      soundManager.playMessageSound();
     }
+    setMessageInput('');
+    setReplyingTo(null);
   };
 
   const handleReplyClick = (message: ChatMessage) => {
@@ -207,6 +217,20 @@ const ChatInterface: React.FC = () => {
     setSoundEnabled(!soundEnabled);
     soundManager.toggleSound(!soundEnabled);
   };
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  // If iOS and fullscreen, use the iOS-specific component
+  if (isIOS && isFullscreen) {
+    return (
+      <IOSFullscreenChat
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        onExitFullscreen={handleFullscreenToggle}
+        isTyping={typingUsersList.length > 0}
+      />
+    );
+  }
 
   return (
     <>
@@ -337,7 +361,7 @@ const ChatInterface: React.FC = () => {
           ) : (
             <form 
               ref={formRef}
-              onSubmit={handleSendMessage} 
+              onSubmit={handleMessageSubmit} 
               className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
                 isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
