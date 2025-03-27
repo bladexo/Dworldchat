@@ -27,6 +27,8 @@ const TextBox = React.forwardRef<HTMLInputElement, TextBoxProps>(
             error && "border-red-500/50 focus:border-red-500 focus:ring-red-500/20",
             className
           )}
+          autoComplete="off"
+          data-form-type="other"
           ref={ref}
           {...props}
         />
