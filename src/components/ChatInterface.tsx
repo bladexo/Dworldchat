@@ -353,7 +353,7 @@ const ChatInterface: React.FC = () => {
             <div 
               ref={formRef}
               role="presentation"
-              className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
+              className={`flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
                 isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
               style={{
@@ -391,6 +391,8 @@ const ChatInterface: React.FC = () => {
               )}
               <div className="flex gap-1 sm:gap-2">
                 <Input
+                  inputMode="text"
+                  type="text"
                   ref={inputRef}
                   value={messageInput}
                   onChange={handleMessageInput}
