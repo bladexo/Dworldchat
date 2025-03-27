@@ -4,7 +4,6 @@ import MessageList from './MessageList';
 import UsernameBadge from './UsernameBadge';
 import OnlineCounter from './OnlineCounter';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Terminal, Send, UserPlus, Loader2, X, Wifi, WifiOff, Minimize, Maximize, Volume2, VolumeX } from 'lucide-react';
 import NotificationFeed from './NotificationFeed';
 import TypingIndicator from './TypingIndicator';
@@ -347,24 +346,10 @@ const ChatInterface: React.FC = () => {
             </div>
           ) : (
             <div 
-              ref={formRef}
-              role="presentation"
-              className={`flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
-                isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
-              }`}
+              className="flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 absolute bottom-0 left-0 right-0 z-10"
               style={{
                 backgroundColor: '#000F00',
-                boxShadow: '0 -2px 10px rgba(0,0,0,0.3)',
-                ...(isFullscreen ? {
-                  position: 'fixed',
-                  bottom: window.visualViewport?.height 
-                    ? `${window.innerHeight - window.visualViewport.height}px` 
-                    : '0',
-                  paddingBottom: 'env(safe-area-inset-bottom)'
-                } : {
-                  position: 'absolute',
-                  bottom: 0
-                })
+                boxShadow: '0 -2px 10px rgba(0,0,0,0.3)'
               }}
             >
               {replyingTo && (
@@ -386,14 +371,33 @@ const ChatInterface: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-1 sm:gap-2">
-                <Input
-                  type="text"
+                <input
                   ref={inputRef}
+                  type="text"
                   value={messageInput}
                   onChange={handleMessageInput}
                   onKeyDown={handleKeyPress}
                   placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
+                  style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    width: '100%',
+                    minWidth: '0',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                    e.target.style.boxShadow = '0 0 0 2px rgba(255, 255, 255, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
                 <Button 
                   onClick={handleSendMessage}
