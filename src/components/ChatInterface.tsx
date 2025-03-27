@@ -72,15 +72,14 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     const adjustChatHeight = () => {
       const viewport = window.visualViewport;
-      if (!viewport || !isMobile) return;
+      if (!viewport || !isMobile || !isFullscreen) return;
 
       const keyboardHeight = window.innerHeight - viewport.height;
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const headerHeight = 48; // Header height
-      const inputHeight = 56; // Input form height
-      const safeAreaBottom = isIOS ? 20 : 0; // iOS safe area
 
-      // Always keep header fixed at top
+      if (!isIOS) return; // Only apply these changes for iOS
+
+      // Header stays absolutely fixed at top
       const header = chatWindowRef.current?.querySelector('.terminal-header');
       if (header) {
         (header as HTMLElement).style.position = 'fixed';
@@ -91,29 +90,30 @@ const ChatInterface: React.FC = () => {
         (header as HTMLElement).style.backgroundColor = '#001100';
       }
 
-      // Message container adjusts height
+      // Message container adjusts height and position
       if (messageContainerRef.current) {
+        const headerHeight = 48; // Header height
+        const inputHeight = 56; // Input form height
+        
         messageContainerRef.current.style.position = 'fixed';
         messageContainerRef.current.style.top = `${headerHeight}px`;
         messageContainerRef.current.style.left = '0';
         messageContainerRef.current.style.right = '0';
-        messageContainerRef.current.style.height = `${viewport.height - headerHeight - inputHeight - (keyboardHeight > 0 ? 0 : safeAreaBottom)}px`;
+        messageContainerRef.current.style.height = `${viewport.height - headerHeight - inputHeight}px`;
         messageContainerRef.current.style.overflowY = 'auto';
         messageContainerRef.current.style.overflowX = 'hidden';
         messageContainerRef.current.style.backgroundColor = '#001100';
       }
 
-      // Form moves up with keyboard
+      // Form follows keyboard
       if (formRef.current) {
         formRef.current.style.position = 'fixed';
         formRef.current.style.left = '0';
         formRef.current.style.right = '0';
         formRef.current.style.bottom = `${keyboardHeight}px`;
-        formRef.current.style.backgroundColor = '#000F00';
         formRef.current.style.zIndex = '50';
-        if (isIOS) {
-          formRef.current.style.paddingBottom = keyboardHeight > 0 ? '8px' : 'env(safe-area-inset-bottom)';
-        }
+        formRef.current.style.backgroundColor = '#000F00';
+        formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
       }
 
       // Main container stays fixed
@@ -122,35 +122,32 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.top = '0';
         chatWindowRef.current.style.left = '0';
         chatWindowRef.current.style.right = '0';
-        chatWindowRef.current.style.bottom = '0';
         chatWindowRef.current.style.height = '100%';
         chatWindowRef.current.style.overflow = 'hidden';
       }
     };
 
-    // Add event listeners
-    window.visualViewport?.addEventListener('resize', adjustChatHeight);
-    window.visualViewport?.addEventListener('scroll', adjustChatHeight);
-    window.addEventListener('orientationchange', adjustChatHeight);
-    
-    // Initial adjustment
-    adjustChatHeight();
-    
-    return () => {
-      window.visualViewport?.removeEventListener('resize', adjustChatHeight);
-      window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
-      window.removeEventListener('orientationchange', adjustChatHeight);
-    };
-  }, [isMobile]);
+    if (isMobile && isFullscreen) {
+      window.visualViewport?.addEventListener('resize', adjustChatHeight);
+      window.visualViewport?.addEventListener('scroll', adjustChatHeight);
+      window.addEventListener('orientationchange', adjustChatHeight);
+      adjustChatHeight(); // Initial adjustment
 
-  // Cleanup when component unmounts
+      return () => {
+        window.visualViewport?.removeEventListener('resize', adjustChatHeight);
+        window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
+        window.removeEventListener('orientationchange', adjustChatHeight);
+      };
+    }
+    
+    return undefined;
+  }, [isMobile, isFullscreen]);
+
+  // Cleanup when fullscreen changes
   useEffect(() => {
-    return () => {
-      if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = '';
-        chatWindowRef.current.style.height = '';
-        chatWindowRef.current.style.overflow = '';
-      }
+    if (!isFullscreen) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (!isIOS) return;
 
       const header = chatWindowRef.current?.querySelector('.terminal-header');
       if (header) {
@@ -178,11 +175,20 @@ const ChatInterface: React.FC = () => {
         formRef.current.style.bottom = '';
         formRef.current.style.left = '';
         formRef.current.style.right = '';
-        formRef.current.style.paddingBottom = '';
         formRef.current.style.zIndex = '';
+        formRef.current.style.paddingBottom = '';
       }
-    };
-  }, []);
+
+      if (chatWindowRef.current) {
+        chatWindowRef.current.style.position = '';
+        chatWindowRef.current.style.top = '';
+        chatWindowRef.current.style.left = '';
+        chatWindowRef.current.style.right = '';
+        chatWindowRef.current.style.height = '';
+        chatWindowRef.current.style.overflow = '';
+      }
+    }
+  }, [isFullscreen]);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
