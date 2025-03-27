@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .textbox-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .textbox-label {
+      font-family: monospace;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .textbox {
+      min-height: 40px;
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.4);
+      padding: 8px 12px;
+      font-family: monospace;
+      font-size: 14px;
+      color: white;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    .textbox:focus {
+      border-color: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+    }
+
+    .textbox:empty::before {
+      content: attr(placeholder);
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .textbox:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .textbox-error {
+      border-color: rgba(255, 0, 0, 0.5);
+    }
+
+    .textbox-error:focus {
+      border-color: rgba(255, 0, 0, 0.8);
+      box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.2);
+    }
+
+    .helper-text {
+      font-family: monospace;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .error-text {
+      color: rgba(255, 0, 0, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="textbox-container">
+    <label class="textbox-label">Message</label>
+    <div 
+      class="textbox" 
+      contenteditable="true" 
+      placeholder="Type your message..."
+      role="textbox"
+      aria-label="Message input"
+    ></div>
+    <span class="helper-text">Press Enter to send</span>
+  </div>
+
+  <script>
+    const textbox = document.querySelector('.textbox');
+    
+    textbox.addEventListener('input', (e) => {
+      const content = e.target.textContent;
+      // Handle input change
+      console.log('Input changed:', content);
+    });
+
+    textbox.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const content = textbox.textContent.trim();
+        if (content) {
+          // Handle send message
+          console.log('Sending message:', content);
+          textbox.textContent = '';
+        }
+      }
+    });
+  </script>
+</body>
+</html> 
