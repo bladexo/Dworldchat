@@ -11,6 +11,13 @@ const TextBox = React.forwardRef<HTMLInputElement, TextBoxProps>(
   ({ className, type, error, label, helperText, ...props }, ref) => {
     return (
       <div className="flex flex-col gap-1">
+        {/* Hidden input to prevent autofill */}
+        <input 
+          type="text" 
+          style={{ display: 'none' }} 
+          name="hidden" 
+          autoComplete="new-off"
+        />
         {label && (
           <label className="text-sm font-mono text-white/80">
             {label}
@@ -27,8 +34,12 @@ const TextBox = React.forwardRef<HTMLInputElement, TextBoxProps>(
             error && "border-red-500/50 focus:border-red-500 focus:ring-red-500/20",
             className
           )}
-          autoComplete="off"
+          autoComplete="new-off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
           data-form-type="other"
+          role="presentation"
           ref={ref}
           {...props}
         />
