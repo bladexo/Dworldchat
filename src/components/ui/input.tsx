@@ -3,21 +3,27 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, ...props }, ref) => {
+  ({ className, type, ...props }, ref) => {
+    // Use non-standard characters in name to prevent recognition
+    const timestamp = Date.now();
+    const randomName = `nх_${timestamp}`; // Note: 'х' is Cyrillic 'x', not Latin 'x'
+    
     return (
-      <div className="chat-input-wrapper">
-        <input
-          {...props}
-          ref={ref}
-          type="text" 
-          role="textbox"
-          aria-label="Chat message"
-          className={cn(
-            "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-            className
-          )}
-        />
-      </div>
+      <input
+        type={type || "text"}
+        id={randomName}
+        name={randomName}
+        autoComplete="chrome-off" // Special value to prevent Chrome autofill
+        data-lpignore="true"
+        data-form-type="other"
+        translate="no" // Prevents browser from translating/analyzing content
+        className={cn(
+          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
     )
   }
 )
