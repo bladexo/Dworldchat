@@ -4,16 +4,15 @@ import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
-    // Generate a random ID to prevent browser from recognizing the field
-    const randomId = `msg_${Math.random().toString(36).substring(2)}`;
+    // Use non-standard characters in name to prevent recognition
+    const timestamp = Date.now();
+    const randomName = `nх_${timestamp}`; // Note: 'х' is Cyrillic 'x', not Latin 'x'
     
     return (
       <input
         type={type || "text"}
-        role="textbox"
-        aria-label="Text input"
-        id={randomId}
-        name={randomId}
+        id={randomName}
+        name={randomName}
         autoComplete="chrome-off" // Special value to prevent Chrome autofill
         data-lpignore="true"
         data-form-type="other"
