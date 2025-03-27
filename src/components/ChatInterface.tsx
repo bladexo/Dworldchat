@@ -11,8 +11,6 @@ import TypingIndicator from './TypingIndicator';
 import { soundManager } from '@/utils/sound';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFullscreen } from '@/hooks/use-fullscreen';
-import IOSFullscreenChat from './IOSFullscreenChat';
-import { Message } from '../types/Message';
 
 const ChatInterface: React.FC = () => {
   const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
@@ -70,13 +68,10 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Enhanced viewport height management
+  // Simple viewport height management without browser API
   useEffect(() => {
     const adjustChatHeight = () => {
-      const viewport = window.visualViewport;
-      if (!viewport || !isMobile || !isFullscreen) return;
-
-      const keyboardHeight = window.innerHeight - viewport.height;
+      if (!isMobile || !isFullscreen) return;
 
       // Main container stays fixed
       if (chatWindowRef.current) {
@@ -85,6 +80,7 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.left = '0';
         chatWindowRef.current.style.right = '0';
         chatWindowRef.current.style.bottom = '0';
+        chatWindowRef.current.style.height = '100%';
         chatWindowRef.current.style.overflow = 'hidden';
       }
 
@@ -92,17 +88,16 @@ const ChatInterface: React.FC = () => {
       if (messageContainerRef.current) {
         const headerHeight = 48; // Header height
         const inputHeight = 56; // Input form height
-        const availableHeight = viewport.height - headerHeight - inputHeight;
-        messageContainerRef.current.style.height = `${availableHeight}px`;
+        messageContainerRef.current.style.height = `calc(100% - ${headerHeight + inputHeight}px)`;
         messageContainerRef.current.style.overflowY = 'auto';
       }
 
-      // Form moves up with keyboard
+      // Form stays at bottom
       if (formRef.current) {
         formRef.current.style.position = 'fixed';
         formRef.current.style.left = '0';
         formRef.current.style.right = '0';
-        formRef.current.style.bottom = `${keyboardHeight}px`;
+        formRef.current.style.bottom = '0';
         formRef.current.style.backgroundColor = '#000F00';
         if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
           formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
@@ -111,13 +106,11 @@ const ChatInterface: React.FC = () => {
     };
 
     if (isMobile && isFullscreen) {
-      window.visualViewport?.addEventListener('resize', adjustChatHeight);
-      window.visualViewport?.addEventListener('scroll', adjustChatHeight);
+      window.addEventListener('resize', adjustChatHeight);
       adjustChatHeight(); // Initial adjustment
       
       return () => {
-        window.visualViewport?.removeEventListener('resize', adjustChatHeight);
-        window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
+        window.removeEventListener('resize', adjustChatHeight);
       };
     }
     
@@ -133,6 +126,7 @@ const ChatInterface: React.FC = () => {
         chatWindowRef.current.style.left = '';
         chatWindowRef.current.style.right = '';
         chatWindowRef.current.style.bottom = '';
+        chatWindowRef.current.style.height = '';
         chatWindowRef.current.style.overflow = '';
       }
       
@@ -154,30 +148,22 @@ const ChatInterface: React.FC = () => {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (!inputRef.current?.value.trim()) return;
-      handleSendMessage(inputRef.current.value);
-      inputRef.current.value = '';
+      handleSendMessage(e as unknown as React.FormEvent);
     }
   };
 
-  const handleMessageSubmit = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputRef.current?.value.trim()) return;
     
-    const message = inputRef.current.value;
-    await handleSendMessage(message);
-    inputRef.current.value = '';
-  };
-
-  const handleSendMessage = async (message: string) => {
-    if (!message.trim()) return;
-    
-    await sendMessage(message, replyingTo);
-    if (soundEnabled) {
-      soundManager.playMessageSound();
+    if (messageInput.trim()) {
+      // Simple send without any focus or scroll manipulation
+      await sendMessage(messageInput, replyingTo);
+      if (soundEnabled) {
+        soundManager.playMessageSound();
+      }
+      setMessageInput('');
+      setReplyingTo(null);
     }
-    setMessageInput('');
-    setReplyingTo(null);
   };
 
   const handleReplyClick = (message: ChatMessage) => {
@@ -217,20 +203,6 @@ const ChatInterface: React.FC = () => {
     setSoundEnabled(!soundEnabled);
     soundManager.toggleSound(!soundEnabled);
   };
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-  // If iOS and fullscreen, use the iOS-specific component
-  if (isIOS && isFullscreen) {
-    return (
-      <IOSFullscreenChat
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        onExitFullscreen={handleFullscreenToggle}
-        isTyping={typingUsersList.length > 0}
-      />
-    );
-  }
 
   return (
     <>
@@ -320,7 +292,8 @@ const ChatInterface: React.FC = () => {
             style={{
               position: 'relative',
               overflowY: 'auto',
-              overscrollBehavior: 'contain'
+              overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch'
             }}
           >
             <MessageList 
@@ -361,7 +334,7 @@ const ChatInterface: React.FC = () => {
           ) : (
             <form 
               ref={formRef}
-              onSubmit={handleMessageSubmit} 
+              onSubmit={handleSendMessage} 
               className={`input-form flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
                 isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
