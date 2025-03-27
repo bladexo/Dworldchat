@@ -145,7 +145,7 @@
       overscroll-behavior: contain;
     }
 
-    .terminal-body .input-form {
+    .terminal-body .message-input {
       position: relative;
       background: #000F00;
       border-top: 1px solid rgba(57, 255, 20, 0.3);
