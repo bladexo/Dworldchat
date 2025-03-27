@@ -5,18 +5,19 @@ import { cn } from "@/lib/utils"
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
     // Generate a random ID to prevent browser from recognizing the field
-    const randomId = `input_${Math.random().toString(36).substring(2)}`;
+    const randomId = `msg_${Math.random().toString(36).substring(2)}`;
     
     return (
       <input
-        type="text"
+        type={type || "text"}
         role="textbox"
         aria-label="Text input"
         id={randomId}
         name={randomId}
-        autoComplete="off"
+        autoComplete="chrome-off" // Special value to prevent Chrome autofill
         data-lpignore="true"
         data-form-type="other"
+        translate="no" // Prevents browser from translating/analyzing content
         className={cn(
           "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
           className
