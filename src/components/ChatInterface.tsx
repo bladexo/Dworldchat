@@ -158,15 +158,8 @@ const ChatInterface: React.FC = () => {
   }, [isFullscreen]);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (messageInput.trim()) {
-      await sendMessage(messageInput, replyingTo);
+    if (e.key === 'Enter' && messageInput.trim()) {
+      sendMessage(messageInput, replyingTo);
       if (soundEnabled) {
         soundManager.playMessageSound();
       }
@@ -211,6 +204,17 @@ const ChatInterface: React.FC = () => {
   const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
     soundManager.toggleSound(!soundEnabled);
+  };
+
+  const handleButtonClick = () => {
+    if (messageInput.trim()) {
+      sendMessage(messageInput, replyingTo);
+      if (soundEnabled) {
+        soundManager.playMessageSound();
+      }
+      setMessageInput('');
+      setReplyingTo(null);
+    }
   };
 
   return (
@@ -395,7 +399,7 @@ const ChatInterface: React.FC = () => {
                   className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
                 />
                 <Button 
-                  onClick={handleSendMessage}
+                  onClick={handleButtonClick}
                   className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0"
                   disabled={!messageInput.trim()}
                 >
