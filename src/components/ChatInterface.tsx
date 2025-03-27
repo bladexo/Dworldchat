@@ -4,7 +4,7 @@ import MessageList from './MessageList';
 import UsernameBadge from './UsernameBadge';
 import OnlineCounter from './OnlineCounter';
 import { Button } from '@/components/ui/button';
-import { TextBox } from '@/components/ui/textbox';
+import { Input } from '@/components/ui/input';
 import { Terminal, Send, UserPlus, Loader2, X, Wifi, WifiOff, Minimize, Maximize, Volume2, VolumeX } from 'lucide-react';
 import NotificationFeed from './NotificationFeed';
 import TypingIndicator from './TypingIndicator';
@@ -371,7 +371,7 @@ const ChatInterface: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-1 sm:gap-2">
-                <TextBox
+                <Input
                   ref={inputRef}
                   value={messageInput}
                   onChange={handleMessageInput}
