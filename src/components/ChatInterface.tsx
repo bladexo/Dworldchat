@@ -399,7 +399,7 @@ const ChatInterface: React.FC = () => {
                     }
                   }}
                   placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none min-h-[32px] py-1.5"
+                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none min-h-[25px] py-1.5 pb-2"
                 />
                 <Button 
                   onClick={handleSendMessage}
