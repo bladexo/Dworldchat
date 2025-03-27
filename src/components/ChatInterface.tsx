@@ -68,79 +68,102 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Enhanced viewport height management with dvh units
+  // Enhanced viewport height management for iOS
   useEffect(() => {
-    const adjustChatHeight = () => {
+    const adjustLayout = () => {
       const viewport = window.visualViewport;
       if (!viewport || !isMobile || !isFullscreen) return;
 
-      const keyboardHeight = window.innerHeight - viewport.height;
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (!isIOS) return;
 
-      if (!isIOS) return; // Only apply these changes for iOS
+      const keyboardHeight = window.innerHeight - viewport.height;
+      const headerHeight = 48;
+      const inputHeight = 56;
+      const safeAreaBottom = 20;
 
-      // Header stays absolutely fixed at top
-      const header = chatWindowRef.current?.querySelector('.terminal-header');
+      // 1. Header - Always fixed at top
+      const header = chatWindowRef.current?.querySelector('.terminal-header') as HTMLElement;
       if (header) {
-        (header as HTMLElement).style.position = 'fixed';
-        (header as HTMLElement).style.top = '0';
-        (header as HTMLElement).style.left = '0';
-        (header as HTMLElement).style.right = '0';
-        (header as HTMLElement).style.zIndex = '100';
-        (header as HTMLElement).style.backgroundColor = '#001100';
+        Object.assign(header.style, {
+          position: 'fixed',
+          top: '0',
+          left: '0',
+          right: '0',
+          zIndex: '1000',
+          transform: 'translateZ(0)', // Hardware acceleration
+          willChange: 'transform',
+          backgroundColor: '#001100'
+        });
       }
 
-      // Message container adjusts height and position
+      // 2. Message Container - Adjusts height dynamically
       if (messageContainerRef.current) {
-        const headerHeight = 48; // Header height
-        const inputHeight = 56; // Input form height
-        
-        messageContainerRef.current.style.position = 'fixed';
-        messageContainerRef.current.style.top = `${headerHeight}px`;
-        messageContainerRef.current.style.left = '0';
-        messageContainerRef.current.style.right = '0';
-        messageContainerRef.current.style.height = `${viewport.height - headerHeight - inputHeight}px`;
-        messageContainerRef.current.style.overflowY = 'auto';
-        messageContainerRef.current.style.overflowX = 'hidden';
-        messageContainerRef.current.style.backgroundColor = '#001100';
+        Object.assign(messageContainerRef.current.style, {
+          position: 'fixed',
+          top: `${headerHeight}px`,
+          left: '0',
+          right: '0',
+          bottom: `${inputHeight + (keyboardHeight > 0 ? keyboardHeight : 0) + safeAreaBottom}px`,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          transform: 'translateZ(0)', // Hardware acceleration
+          willChange: 'transform, height',
+          touchAction: 'pan-y',
+          zIndex: '1'
+        });
       }
 
-      // Form follows keyboard
+      // 3. Input Form - Follows keyboard
       if (formRef.current) {
-        formRef.current.style.position = 'fixed';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
-        formRef.current.style.bottom = `${keyboardHeight}px`;
-        formRef.current.style.zIndex = '50';
-        formRef.current.style.backgroundColor = '#000F00';
-        formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+        Object.assign(formRef.current.style, {
+          position: 'fixed',
+          left: '0',
+          right: '0',
+          bottom: `${keyboardHeight}px`,
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          backgroundColor: '#000F00',
+          transform: 'translateZ(0)', // Hardware acceleration
+          willChange: 'transform',
+          zIndex: '999'
+        });
       }
 
-      // Main container stays fixed
+      // 4. Main Container - Prevent scrolling
       if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = 'fixed';
-        chatWindowRef.current.style.top = '0';
-        chatWindowRef.current.style.left = '0';
-        chatWindowRef.current.style.right = '0';
-        chatWindowRef.current.style.height = '100%';
-        chatWindowRef.current.style.overflow = 'hidden';
+        Object.assign(chatWindowRef.current.style, {
+          position: 'fixed',
+          top: '0',
+          left: '0',
+          right: '0',
+          height: '100%',
+          overflow: 'hidden',
+          touchAction: 'none'
+        });
+
+        // Prevent body scrolling
+        document.body.style.overflow = 'hidden';
+        document.body.style.touchAction = 'none';
       }
     };
 
     if (isMobile && isFullscreen) {
-      window.visualViewport?.addEventListener('resize', adjustChatHeight);
-      window.visualViewport?.addEventListener('scroll', adjustChatHeight);
-      window.addEventListener('orientationchange', adjustChatHeight);
-      adjustChatHeight(); // Initial adjustment
+      // Initial adjustment
+      adjustLayout();
 
+      // Add event listeners
+      window.visualViewport?.addEventListener('resize', adjustLayout);
+      window.visualViewport?.addEventListener('scroll', adjustLayout);
+      window.addEventListener('orientationchange', adjustLayout);
+
+      // Cleanup
       return () => {
-        window.visualViewport?.removeEventListener('resize', adjustChatHeight);
-        window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
-        window.removeEventListener('orientationchange', adjustChatHeight);
+        window.visualViewport?.removeEventListener('resize', adjustLayout);
+        window.visualViewport?.removeEventListener('scroll', adjustLayout);
+        window.removeEventListener('orientationchange', adjustLayout);
       };
     }
-    
-    return undefined;
   }, [isMobile, isFullscreen]);
 
   // Cleanup when fullscreen changes
@@ -149,43 +172,68 @@ const ChatInterface: React.FC = () => {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       if (!isIOS) return;
 
-      const header = chatWindowRef.current?.querySelector('.terminal-header');
+      // Reset header styles
+      const header = chatWindowRef.current?.querySelector('.terminal-header') as HTMLElement;
       if (header) {
-        (header as HTMLElement).style.position = '';
-        (header as HTMLElement).style.top = '';
-        (header as HTMLElement).style.left = '';
-        (header as HTMLElement).style.right = '';
-        (header as HTMLElement).style.zIndex = '';
-        (header as HTMLElement).style.backgroundColor = '';
+        Object.assign(header.style, {
+          position: '',
+          top: '',
+          left: '',
+          right: '',
+          zIndex: '',
+          transform: '',
+          willChange: '',
+          backgroundColor: ''
+        });
       }
-      
+
+      // Reset message container styles
       if (messageContainerRef.current) {
-        messageContainerRef.current.style.position = '';
-        messageContainerRef.current.style.top = '';
-        messageContainerRef.current.style.left = '';
-        messageContainerRef.current.style.right = '';
-        messageContainerRef.current.style.height = '';
-        messageContainerRef.current.style.overflowY = '';
-        messageContainerRef.current.style.overflowX = '';
-        messageContainerRef.current.style.backgroundColor = '';
+        Object.assign(messageContainerRef.current.style, {
+          position: '',
+          top: '',
+          left: '',
+          right: '',
+          bottom: '',
+          overflowY: '',
+          overflowX: '',
+          WebkitOverflowScrolling: '',
+          transform: '',
+          willChange: '',
+          touchAction: '',
+          zIndex: ''
+        });
       }
 
+      // Reset input form styles
       if (formRef.current) {
-        formRef.current.style.position = '';
-        formRef.current.style.bottom = '';
-        formRef.current.style.left = '';
-        formRef.current.style.right = '';
-        formRef.current.style.zIndex = '';
-        formRef.current.style.paddingBottom = '';
+        Object.assign(formRef.current.style, {
+          position: '',
+          left: '',
+          right: '',
+          bottom: '',
+          paddingBottom: '',
+          backgroundColor: '',
+          transform: '',
+          willChange: '',
+          zIndex: ''
+        });
       }
 
+      // Reset main container and body styles
       if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = '';
-        chatWindowRef.current.style.top = '';
-        chatWindowRef.current.style.left = '';
-        chatWindowRef.current.style.right = '';
-        chatWindowRef.current.style.height = '';
-        chatWindowRef.current.style.overflow = '';
+        Object.assign(chatWindowRef.current.style, {
+          position: '',
+          top: '',
+          left: '',
+          right: '',
+          height: '',
+          overflow: '',
+          touchAction: ''
+        });
+
+        document.body.style.overflow = '';
+        document.body.style.touchAction = '';
       }
     }
   }, [isFullscreen]);
