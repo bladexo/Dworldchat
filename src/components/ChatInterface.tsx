@@ -4,13 +4,13 @@ import MessageList from './MessageList';
 import UsernameBadge from './UsernameBadge';
 import OnlineCounter from './OnlineCounter';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Terminal, Send, UserPlus, Loader2, X, Wifi, WifiOff, Minimize, Maximize, Volume2, VolumeX } from 'lucide-react';
 import NotificationFeed from './NotificationFeed';
 import TypingIndicator from './TypingIndicator';
 import { soundManager } from '@/utils/sound';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFullscreen } from '@/hooks/use-fullscreen';
+import { TextBox } from '@/components/ui/textbox';
 
 const ChatInterface: React.FC = () => {
   const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
@@ -18,12 +18,12 @@ const ChatInterface: React.FC = () => {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const messageContainerRef = useRef<HTMLDivElement>(null);
-  const inputContainerRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const typingUsersList = Array.from(typingUsers)
     .filter(([id, _]) => id !== currentUser?.id)
@@ -102,14 +102,14 @@ const ChatInterface: React.FC = () => {
         }
 
         // Form moves up with keyboard
-        if (inputContainerRef.current) {
-          inputContainerRef.current.style.position = 'fixed';
-          inputContainerRef.current.style.left = '0';
-          inputContainerRef.current.style.right = '0';
-          inputContainerRef.current.style.bottom = `${keyboardHeight}px`;
-          inputContainerRef.current.style.backgroundColor = '#000F00';
+        if (formRef.current) {
+          formRef.current.style.position = 'fixed';
+          formRef.current.style.left = '0';
+          formRef.current.style.right = '0';
+          formRef.current.style.bottom = `${keyboardHeight}px`;
+          formRef.current.style.backgroundColor = '#000F00';
           if (isIOS) {
-            inputContainerRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+            formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
           }
         }
       }, 50);
@@ -147,18 +147,18 @@ const ChatInterface: React.FC = () => {
         messageContainerRef.current.style.paddingBottom = '60px';
       }
 
-      if (inputContainerRef.current) {
-        inputContainerRef.current.style.position = 'absolute';
-        inputContainerRef.current.style.bottom = '0';
-        inputContainerRef.current.style.left = '0';
-        inputContainerRef.current.style.right = '0';
-        inputContainerRef.current.style.paddingBottom = '4px';
+      if (formRef.current) {
+        formRef.current.style.position = 'absolute';
+        formRef.current.style.bottom = '0';
+        formRef.current.style.left = '0';
+        formRef.current.style.right = '0';
+        formRef.current.style.paddingBottom = '4px';
       }
     }
   }, [isFullscreen]);
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -184,10 +184,9 @@ const ChatInterface: React.FC = () => {
     setReplyingTo(null);
   };
 
-  const handleMessageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setMessageInput(newValue);
-    handleInputChange(newValue);
+  const handleMessageInput = (value: string) => {
+    setMessageInput(value);
+    handleInputChange(value);
   };
 
   const handleCreateUser = async () => {
@@ -347,9 +346,9 @@ const ChatInterface: React.FC = () => {
             </div>
           ) : (
             <div 
-              ref={inputContainerRef}
+              ref={formRef}
               role="presentation"
-              className={`message-input flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
+              className={`flex-shrink-0 pt-2 pb-2 flex flex-col gap-1 sm:gap-2 bg-[#000F00] px-2 ${
                 isFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : 'absolute bottom-0 left-0 right-0 z-10'
               }`}
               style={{
@@ -386,13 +385,22 @@ const ChatInterface: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-1 sm:gap-2">
-                <Input
+                <div 
                   ref={inputRef}
-                  value={messageInput}
-                  onChange={handleMessageInput}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0"
+                  contentEditable
+                  className="flex min-h-[40px] w-full rounded-md border font-mono bg-black/40 px-3 py-2 text-sm transition-colors text-white border-white/20 focus:border-white/50 focus:outline-none focus:ring-2 focus:ring-white/10 placeholder-white/30 min-w-0 empty:before:content-[attr(data-placeholder)] empty:before:text-white/30"
+                  data-placeholder="Type your message..."
+                  onInput={(e) => {
+                    const content = e.currentTarget.textContent || '';
+                    setMessageInput(content);
+                    handleInputChange(content);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
                 />
                 <Button 
                   onClick={handleSendMessage}
