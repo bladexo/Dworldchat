@@ -68,115 +68,91 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Enhanced viewport height management with fixed elements
+  // Enhanced viewport height management
   useEffect(() => {
-    const adjustChatHeight = () => {
+    let timeoutId: NodeJS.Timeout;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    
+    const handleVisualViewportChange = () => {
       const viewport = window.visualViewport;
       if (!viewport || !isMobile || !isFullscreen) return;
 
-      const keyboardHeight = window.innerHeight - viewport.height;
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const headerHeight = 48; // Header height
-      const inputHeight = 56; // Input form height
+      if (timeoutId) clearTimeout(timeoutId);
 
-      // Lock body height to prevent scrolling
-      document.body.style.height = viewport.height + "px";
-      document.body.style.overflow = "hidden";
-      
-      // The chat window is the wrapper
-      if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = 'fixed';
-        chatWindowRef.current.style.top = '0';
-        chatWindowRef.current.style.left = '0';
-        chatWindowRef.current.style.right = '0';
-        chatWindowRef.current.style.bottom = '0';
-        chatWindowRef.current.style.height = '100%';
-        chatWindowRef.current.style.overflow = 'hidden';
-      }
+      timeoutId = setTimeout(() => {
+        const keyboardHeight = window.innerHeight - viewport.height;
 
-      // Message container adjusts based on header and input
-      if (messageContainerRef.current) {
-        messageContainerRef.current.style.position = 'absolute';
-        messageContainerRef.current.style.top = `${headerHeight}px`;
-        messageContainerRef.current.style.left = '0';
-        messageContainerRef.current.style.right = '0';
-        messageContainerRef.current.style.bottom = `${inputHeight + keyboardHeight}px`;
-        messageContainerRef.current.style.height = 'auto';
-        messageContainerRef.current.style.overflowY = 'auto';
-        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = 'touch';
-      }
-
-      // Form moves up with keyboard
-      if (formRef.current) {
-        formRef.current.style.position = 'fixed';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
-        formRef.current.style.height = `${inputHeight}px`;
-        formRef.current.style.bottom = `${keyboardHeight}px`;
-        formRef.current.style.backgroundColor = '#000F00';
-        formRef.current.style.zIndex = '5';
-        if (isIOS) {
-          formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+        // Simple fixed positioning for the container
+        if (chatWindowRef.current) {
+          chatWindowRef.current.style.position = 'fixed';
+          chatWindowRef.current.style.top = '0';
+          chatWindowRef.current.style.left = '0';
+          chatWindowRef.current.style.right = '0';
+          chatWindowRef.current.style.bottom = '0';
         }
-      }
+
+        // Message container adjusts its height based on keyboard
+        if (messageContainerRef.current) {
+          const headerHeight = 48; // Header height
+          const inputHeight = 56; // Input form height
+          const availableHeight = viewport.height - headerHeight - inputHeight;
+          messageContainerRef.current.style.height = `${availableHeight}px`;
+          messageContainerRef.current.style.overflowY = 'auto';
+        }
+
+        // Form moves up with keyboard
+        if (formRef.current) {
+          formRef.current.style.position = 'fixed';
+          formRef.current.style.left = '0';
+          formRef.current.style.right = '0';
+          formRef.current.style.bottom = `${keyboardHeight}px`;
+          formRef.current.style.backgroundColor = '#000F00';
+          if (isIOS) {
+            formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
+          }
+        }
+      }, 50);
     };
 
     if (isMobile && isFullscreen) {
-      document.body.style.overscrollBehavior = 'none';
-      window.visualViewport?.addEventListener('resize', adjustChatHeight);
-      window.visualViewport?.addEventListener('scroll', adjustChatHeight);
-      window.addEventListener('orientationchange', adjustChatHeight);
-      setTimeout(adjustChatHeight, 50); // Initial adjustment with slight delay
+      window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
+      handleVisualViewportChange();
       
       return () => {
-        document.body.style.overscrollBehavior = '';
-        document.body.style.height = '';
-        document.body.style.overflow = '';
-        window.visualViewport?.removeEventListener('resize', adjustChatHeight);
-        window.visualViewport?.removeEventListener('scroll', adjustChatHeight);
-        window.removeEventListener('orientationchange', adjustChatHeight);
+        if (timeoutId) clearTimeout(timeoutId);
+        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
       };
     }
     
     return undefined;
   }, [isMobile, isFullscreen]);
 
-  // Cleanup when fullscreen changes
+  // Thorough cleanup when fullscreen changes
   useEffect(() => {
     if (!isFullscreen) {
-      document.body.style.height = '';
-      document.body.style.overflow = '';
-      document.body.style.overscrollBehavior = '';
-      
       if (chatWindowRef.current) {
         chatWindowRef.current.style.position = '';
         chatWindowRef.current.style.top = '';
         chatWindowRef.current.style.left = '';
         chatWindowRef.current.style.right = '';
         chatWindowRef.current.style.bottom = '';
-        chatWindowRef.current.style.height = '';
-        chatWindowRef.current.style.overflow = '';
       }
       
       if (messageContainerRef.current) {
-        messageContainerRef.current.style.position = '';
-        messageContainerRef.current.style.top = '';
-        messageContainerRef.current.style.left = '';
-        messageContainerRef.current.style.right = '';
-        messageContainerRef.current.style.bottom = '';
         messageContainerRef.current.style.height = '';
         messageContainerRef.current.style.overflowY = '';
-        (messageContainerRef.current.style as any)['-webkit-overflow-scrolling'] = '';
+        messageContainerRef.current.style.paddingBottom = '60px';
       }
 
       if (formRef.current) {
-        formRef.current.style.position = '';
-        formRef.current.style.bottom = '';
-        formRef.current.style.left = '';
-        formRef.current.style.right = '';
-        formRef.current.style.height = '';
-        formRef.current.style.zIndex = '';
-        formRef.current.style.paddingBottom = '';
+        formRef.current.style.position = 'absolute';
+        formRef.current.style.bottom = '0';
+        formRef.current.style.left = '0';
+        formRef.current.style.right = '0';
+        formRef.current.style.paddingBottom = '4px';
       }
     }
   }, [isFullscreen]);
@@ -265,15 +241,8 @@ const ChatInterface: React.FC = () => {
         }}
       >
         <div className={`terminal-header bg-black/40 px-2 sm:px-4 py-1 sm:py-2 flex justify-between items-center flex-shrink-0 ${
-          isFullscreen ? 'border-b border-neon-green/30 fixed top-0 left-0 right-0 z-10' : ''
-        }`}
-        style={isFullscreen ? {
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10
-        } : {}}>
+          isFullscreen ? 'border-b border-neon-green/30' : ''
+        }`}>
           <div className="flex items-center">
             <div className="header-button bg-red-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
             <div className="header-button bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"></div>
@@ -333,9 +302,15 @@ const ChatInterface: React.FC = () => {
             ref={messageContainerRef}
             className="message-container flex-1 overflow-y-auto scrollbar-thin scrollbar-track-black/20 scrollbar-thumb-neon-green/50 hover:scrollbar-thumb-neon-green/70 pr-1 sm:pr-2"
             style={{
-              position: 'relative',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: isFullscreen ? '56px' : '60px',
               overflowY: 'auto',
-              overscrollBehavior: 'contain'
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
+              zIndex: 1
             }}
           >
             <MessageList 
