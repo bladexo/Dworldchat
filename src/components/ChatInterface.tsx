@@ -13,12 +13,18 @@ import { useFullscreen } from '@/hooks/use-fullscreen';
 import { Textarea } from '@/components/ui/textarea';
 
 const ChatInterface: React.FC = () => {
-  const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected } = useChat();
-  const [messageInput, setMessageInput] = useState('');
+  const { messages, currentUser, onlineUsers, notifications, sendMessage, createUser, typingUsers, handleInputChange, isConnected, isMuted, muteTimeRemaining } = useChat();
+  const [input, setInput] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const cooldownRef = useRef<NodeJS.Timeout>();
   const isMobile = useIsMobile();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
@@ -81,37 +87,37 @@ const ChatInterface: React.FC = () => {
       if (timeoutId) clearTimeout(timeoutId);
 
       timeoutId = setTimeout(() => {
-        const keyboardHeight = window.innerHeight - viewport.height;
+      const keyboardHeight = window.innerHeight - viewport.height;
 
         // Simple fixed positioning for the container
-        if (chatWindowRef.current) {
-          chatWindowRef.current.style.position = 'fixed';
-          chatWindowRef.current.style.top = '0';
-          chatWindowRef.current.style.left = '0';
-          chatWindowRef.current.style.right = '0';
-          chatWindowRef.current.style.bottom = '0';
-        }
+      if (chatWindowRef.current) {
+        chatWindowRef.current.style.position = 'fixed';
+        chatWindowRef.current.style.top = '0';
+        chatWindowRef.current.style.left = '0';
+        chatWindowRef.current.style.right = '0';
+        chatWindowRef.current.style.bottom = '0';
+      }
 
         // Message container adjusts its height based on keyboard
-        if (messageContainerRef.current) {
-          const headerHeight = 48; // Header height
-          const inputHeight = 56; // Input form height
-          const availableHeight = viewport.height - headerHeight - inputHeight;
-          messageContainerRef.current.style.height = `${availableHeight}px`;
-          messageContainerRef.current.style.overflowY = 'auto';
-        }
+      if (messageContainerRef.current) {
+        const headerHeight = 48; // Header height
+        const inputHeight = 56; // Input form height
+        const availableHeight = viewport.height - headerHeight - inputHeight;
+        messageContainerRef.current.style.height = `${availableHeight}px`;
+        messageContainerRef.current.style.overflowY = 'auto';
+      }
 
-        // Form moves up with keyboard
-        if (formRef.current) {
-          formRef.current.style.position = 'fixed';
-          formRef.current.style.left = '0';
-          formRef.current.style.right = '0';
-          formRef.current.style.bottom = `${keyboardHeight}px`;
-          formRef.current.style.backgroundColor = '#000F00';
+      // Form moves up with keyboard
+      if (formRef.current) {
+        formRef.current.style.position = 'fixed';
+        formRef.current.style.left = '0';
+        formRef.current.style.right = '0';
+        formRef.current.style.bottom = `${keyboardHeight}px`;
+        formRef.current.style.backgroundColor = '#000F00';
           if (isIOS) {
             formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
           }
-        }
+      }
       }, 50);
     };
 
@@ -157,7 +163,66 @@ const ChatInterface: React.FC = () => {
     }
   }, [isFullscreen]);
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  // Add cooldown timer effect
+  useEffect(() => {
+    if (cooldown > 0) {
+      cooldownRef.current = setInterval(() => {
+        setCooldown(prev => {
+          if (prev <= 1) {
+            if (cooldownRef.current) {
+              clearInterval(cooldownRef.current);
+              // Auto focus the input when cooldown ends
+              setTimeout(() => inputRef.current?.focus(), 0);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, [cooldown]);
+
+  // Format time remaining for mute
+  const formatMuteTime = (ms: number) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Update input placeholder based on mute status
+  const getInputPlaceholder = () => {
+    if (isMuted && muteTimeRemaining) {
+      return `You are muted. Time remaining: ${formatMuteTime(muteTimeRemaining)}`;
+    }
+    if (!isMuted && cooldown > 0) {
+      return `Please wait ${cooldown} seconds before sending another message`;
+    }
+    return 'Type a message...';
+  };
+
+  // Get button text based on status
+  const getButtonText = () => {
+    if (isMuted && muteTimeRemaining) {
+      return `Muted (${formatMuteTime(muteTimeRemaining)})`;
+    }
+    if (!isMuted && cooldown > 0) {
+      return `${cooldown}s`;
+    }
+    return 'Send';
+  };
+
+  // Handle input changes
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (isMuted) return; // Prevent input when muted
+    setInput(e.target.value);
+    handleInputChange(e.target.value);
+  };
+
+  // Handle key press
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -165,13 +230,19 @@ const ChatInterface: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    if (messageInput.trim()) {
-      await sendMessage(messageInput, replyingTo);
-      if (soundEnabled) {
-        soundManager.playMessageSound();
+    if (input.trim()) {
+      const sent = await sendMessage(input, replyingTo);
+      if (sent) {
+        if (soundEnabled) {
+          soundManager.playMessageSound();
+        }
+        setInput('');
+        setReplyingTo(null);
+        // Only apply cooldown if user is not muted
+        if (!isMuted) {
+          setCooldown(5); // Start 5 second cooldown
+        }
       }
-      setMessageInput('');
-      setReplyingTo(null);
     }
   };
 
@@ -182,11 +253,6 @@ const ChatInterface: React.FC = () => {
 
   const handleCancelReply = () => {
     setReplyingTo(null);
-  };
-
-  const handleMessageInput = (value: string) => {
-    setMessageInput(value);
-    handleInputChange(value);
   };
 
   const handleCreateUser = async () => {
@@ -247,21 +313,21 @@ const ChatInterface: React.FC = () => {
               <Terminal className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> GLOBAL_CHAT
             </span>
           </div>
-          <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             {isConnected ? (
               <div className="flex items-center gap-1 text-neon-green">
-                <Wifi className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
+                <Wifi className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">CONNECTED</span>
               </div>
             ) : (
               <div className="flex items-center gap-1 text-red-500">
-                <WifiOff className="h-3 w-3 sm:h-4 sm:w-4" />
+                <WifiOff className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
               </div>
             )}
             <Button
               onClick={toggleSound}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
+              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5"
             >
               {soundEnabled ? (
                 <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -271,7 +337,7 @@ const ChatInterface: React.FC = () => {
             </Button>
             <Button
               onClick={handleFullscreenToggle}
-              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5 sm:p-1"
+              className="bg-transparent border-none text-neon-green hover:bg-neon-green/10 p-0.5"
             >
               {isFullscreen ? (
                 <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -386,28 +452,27 @@ const ChatInterface: React.FC = () => {
               )}
               <div className="flex gap-1 sm:gap-2 p-1 pb-2">
                 <Textarea
-                  ref={inputRef}
-                  value={messageInput}
-                  onChange={(e) => {
-                    setMessageInput(e.target.value);
-                    handleInputChange(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none h-8 py-1 px-3"
+                  ref={textareaRef}
+                  value={input}
+                  onChange={handleInput}
+                  onKeyPress={handleKeyPress}
+                  placeholder={getInputPlaceholder()}
+                  className={`flex-1 bg-gray-900 border-gray-800 text-white placeholder-gray-500 resize-none ${
+                    isMuted ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isMuted}
+                  rows={1}
                 />
                 <Button 
                   onClick={handleSendMessage}
-                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0 h-8"
-                  disabled={!messageInput.trim()}
+                  disabled={!input.trim() || isMuted}
+                  className={`${
+                    isMuted 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  } disabled:bg-gray-700 disabled:cursor-not-allowed`}
                 >
-                  <Send className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="sr-only">Send</span>
+                  {getButtonText()}
                 </Button>
               </div>
             </div>
