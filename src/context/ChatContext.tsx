@@ -8,6 +8,12 @@ import { debounce } from 'lodash';
 // Constants
 const MAX_MESSAGES = 100; // Maximum number of messages to keep in history
 
+// Define the mute info type
+interface MuteInfo {
+  muteUntil: number;
+  duration: number;
+}
+
 // Define the types for our chat messages
 export interface ChatMessage {
   id: string;
@@ -30,6 +36,7 @@ export interface User {
   id: string;
   username: string;
   color: string;
+  muteInfo?: MuteInfo;
 }
 
 // Define the context type
@@ -38,11 +45,13 @@ interface ChatContextType {
   currentUser: User | null;
   onlineUsers: number;
   notifications: Notification[];
-  sendMessage: (content: string, replyTo?: ChatMessage) => void;
+  sendMessage: (content: string, replyTo?: ChatMessage) => boolean;
   createUser: () => void;
   typingUsers: Map<string, { username: string; color: string }>;
   handleInputChange: (content: string) => void;
   isConnected: boolean;
+  isMuted: boolean;
+  muteTimeRemaining: number;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -60,8 +69,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [onlineUsers, setOnlineUsers] = useState<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [lastMessageTime, setLastMessageTime] = useState<number>(0);
-  const MESSAGE_COOLDOWN = 500; // 500ms between messages
+  const MESSAGE_COOLDOWN = 5000; // 5 seconds between messages
   const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; color: string }>>(new Map());
+  const [muteInfo, setMuteInfo] = useState<MuteInfo | null>(null);
+
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     if (!currentUser) return;
     
@@ -157,18 +168,58 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success(`Welcome, ${username}!`);
   }, [socket, isConnected]);
 
-  const sendMessage = useCallback((content: string, replyTo?: ChatMessage) => {
-    if (!socket || !currentUser) return;
+  // Add mute check interval
+  useEffect(() => {
+    const checkMuteInterval = setInterval(() => {
+      if (muteInfo && Date.now() >= muteInfo.muteUntil) {
+        setMuteInfo(null);
+      }
+    }, 1000);
+
+    return () => clearInterval(checkMuteInterval);
+  }, [muteInfo]);
+
+  // Add mute event listener
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('user_muted', ({ duration, muteUntil }) => {
+      setMuteInfo({ duration, muteUntil });
+      toast.error(`You have been muted for ${duration} minutes`);
+    });
+
+    socket.on('user_unmuted', (data) => {
+      if (currentUser && data.username === currentUser.username) {
+        setMuteInfo(null);
+        toast.success('You have been unmuted');
+      }
+    });
+
+    return () => {
+      socket.off('user_muted');
+      socket.off('user_unmuted');
+    };
+  }, [socket, currentUser]);
+
+  const sendMessage = useCallback((content: string, replyTo?: ChatMessage): boolean => {
+    if (!socket || !currentUser) return false;
     
+    if (muteInfo && Date.now() < muteInfo.muteUntil) {
+      const minutesLeft = Math.ceil((muteInfo.muteUntil - Date.now()) / 60000);
+      toast.error(`You are muted for ${minutesLeft} more minute${minutesLeft === 1 ? '' : 's'}`);
+      return false;
+    }
+
     if (!validateMessage(content)) {
       toast.error('Invalid message content');
-      return;
+      return false;
     }
 
     const now = Date.now();
-    if (now - lastMessageTime < MESSAGE_COOLDOWN) {
-      toast.error('Please wait before sending another message');
-      return;
+    const timeLeft = MESSAGE_COOLDOWN - (now - lastMessageTime);
+    if (timeLeft > 0) {
+      toast.error(`Please wait ${Math.ceil(timeLeft / 1000)} seconds before sending another message`);
+      return false;
     }
     setLastMessageTime(now);
 
@@ -183,7 +234,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         content: replyTo.content
       } : undefined
     });
-  }, [socket, currentUser, lastMessageTime]);
+    return true;
+  }, [socket, currentUser, lastMessageTime, muteInfo]);
 
   useEffect(() => {
     if (!socket) return;
@@ -282,17 +334,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [socket]);
 
+  const isMuted = muteInfo !== null && Date.now() < muteInfo.muteUntil;
+  const muteTimeRemaining = isMuted ? Math.ceil((muteInfo!.muteUntil - Date.now()) / 60000) : 0;
 
   const value = {
-  messages,
-  currentUser,
-  onlineUsers,
-  notifications,
-  sendMessage,
-  createUser,
-  typingUsers,
-  handleInputChange,
-  isConnected,
+    messages,
+    currentUser,
+    onlineUsers,
+    notifications,
+    sendMessage,
+    createUser,
+    typingUsers,
+    handleInputChange,
+    isConnected,
+    isMuted,
+    muteTimeRemaining
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
