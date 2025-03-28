@@ -284,7 +284,7 @@ const ChatInterface: React.FC = () => {
                 username={currentUser.username} 
                 color={currentUser.color}
                 showIcon 
-                className="mr-2 sm:mr-3 scale-75 sm:scale-90 md:scale-100"
+                className="scale-75 sm:scale-90 md:scale-100"
               />
             )}
             <OnlineCounter count={onlineUsers} />
@@ -359,7 +359,7 @@ const ChatInterface: React.FC = () => {
                   bottom: window.visualViewport?.height 
                     ? `${window.innerHeight - window.visualViewport.height}px` 
                     : '0',
-                  paddingBottom: 'env(safe-area-inset-bottom)'
+                  paddingBottom: `calc(env(safe-area-inset-bottom) + 8px)`
                 } : {
                   position: 'absolute',
                   bottom: 0
@@ -384,7 +384,7 @@ const ChatInterface: React.FC = () => {
                   </Button>
                 </div>
               )}
-              <div className="flex gap-1 sm:gap-2">
+              <div className="flex gap-1 sm:gap-2 p-1 pb-2">
                 <Textarea
                   ref={inputRef}
                   value={messageInput}
@@ -399,11 +399,11 @@ const ChatInterface: React.FC = () => {
                     }
                   }}
                   placeholder="Type your message..."
-                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none h-[20px] py-1.5 pb-2"
+                  className="font-mono text-xs sm:text-sm bg-black/40 text-white border-white/20 rounded-md focus:border-white/50 focus:ring-white/10 placeholder-white/30 min-w-0 resize-none h-8 py-1 px-3"
                 />
                 <Button 
                   onClick={handleSendMessage}
-                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0 h-[25px]"
+                  className="bg-transparent border border-white/20 text-white hover:bg-white/5 transition-all rounded-md px-2 sm:px-3 flex-shrink-0 h-8"
                   disabled={!messageInput.trim()}
                 >
                   <Send className="h-3 w-3 sm:h-4 sm:w-4" />
