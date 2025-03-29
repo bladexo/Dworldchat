@@ -118,7 +118,7 @@ const ChatInterface: React.FC = () => {
             formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
           }
       }
-      }, 50);
+      }, 100);
     };
 
     if (isMobile && isFullscreen) {
