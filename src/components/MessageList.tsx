@@ -95,35 +95,89 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
               message.mentions?.includes(currentUser?.id || '') 
                 ? 'bg-neon-green/5 border border-neon-green/20' 
               : '',
-            isSystem ? 'bg-neon-green/5' : '',
+            isSystem ? 'relative p-3 my-2 ml-1' : '',
             depth > 0 ? 'relative' : ''
           )}
           style={{
-            marginLeft: depth > 0 ? `${depth * 12}px` : '0',
+            marginLeft: depth > 0 ? `${depth * 12}px` : isSystem ? '10px' : '0',
             ...(isSystem && {
-              background: 'linear-gradient(180deg, rgba(57, 255, 20, 0.05) 0%, rgba(57, 255, 20, 0.02) 100%)',
-              boxShadow: '0 0 20px rgba(57, 255, 20, 0.1)',
+              background: 'rgba(0, 17, 0, 0.7)',
+              borderRadius: '4px',
+              position: 'relative',
+              overflow: 'hidden'
             })
           }}
         >
-          {depth > 0 && (
+          {isSystem && (
             <>
-              <div className="absolute left-0 top-[1.1rem] w-2 border-t border-neon-green/20 -ml-2" />
-              <div className="absolute left-0 -top-4 bottom-0 border-l border-neon-green/20 -ml-2" 
-                   style={{ display: isLastInThread ? 'none' : 'block' }} />
+              {/* Animated borders container */}
+              <div className="absolute inset-0">
+                {/* Top border with breaks and animation */}
+                <div className="absolute top-0 left-0 w-full h-[1px] bg-neon-green/30 animate-glow-pulse" 
+                  style={{ 
+                    boxShadow: '0 0 10px rgba(57, 255, 20, 0.5)',
+                    background: 'linear-gradient(90deg, transparent 0%, #39ff14 50%, transparent 100%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'borderFlow 3s linear infinite'
+                  }}>
+                  <div className="absolute top-0 left-[20%] w-[10%] h-full bg-[#001100]" />
+                  <div className="absolute top-0 right-[20%] w-[10%] h-full bg-[#001100]" />
+                </div>
+                {/* Bottom border with breaks and animation */}
+                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-neon-green/30 animate-glow-pulse"
+                  style={{ 
+                    boxShadow: '0 0 10px rgba(57, 255, 20, 0.5)',
+                    background: 'linear-gradient(90deg, transparent 0%, #39ff14 50%, transparent 100%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'borderFlow 3s linear infinite'
+                  }}>
+                  <div className="absolute top-0 left-[20%] w-[10%] h-full bg-[#001100]" />
+                  <div className="absolute top-0 right-[20%] w-[10%] h-full bg-[#001100]" />
+                </div>
+                {/* Left border with breaks and animation */}
+                <div className="absolute left-0 top-0 w-[1px] h-full bg-neon-green/30 animate-glow-pulse"
+                  style={{ 
+                    boxShadow: '0 0 10px rgba(57, 255, 20, 0.5)',
+                    background: 'linear-gradient(180deg, transparent 0%, #39ff14 50%, transparent 100%)',
+                    backgroundSize: '100% 200%',
+                    animation: 'borderFlowVertical 3s linear infinite'
+                  }}>
+                  <div className="absolute top-[20%] left-0 w-full h-[10%] bg-[#001100]" />
+                  <div className="absolute bottom-[20%] left-0 w-full h-[10%] bg-[#001100]" />
+                </div>
+                {/* Right border with breaks and animation */}
+                <div className="absolute right-0 top-0 w-[1px] h-full bg-neon-green/30 animate-glow-pulse"
+                  style={{ 
+                    boxShadow: '0 0 10px rgba(57, 255, 20, 0.5)',
+                    background: 'linear-gradient(180deg, transparent 0%, #39ff14 50%, transparent 100%)',
+                    backgroundSize: '100% 200%',
+                    animation: 'borderFlowVertical 3s linear infinite'
+                  }}>
+                  <div className="absolute top-[20%] right-0 w-full h-[10%] bg-[#001100]" />
+                  <div className="absolute bottom-[20%] right-0 w-full h-[10%] bg-[#001100]" />
+                </div>
+              </div>
+              {/* System icon with pulse animation */}
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center animate-pulse">
+                <div className="text-neon-green/70" style={{ textShadow: '0 0 10px rgba(57, 255, 20, 0.5)' }}>⚡</div>
+              </div>
             </>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center gap-2", isSystem && "pl-8")}>
             <span className="text-neon-green/50 font-mono text-xs">{depth > 0 ? '└' : ''}</span>
+              {!isSystem && (
               <UsernameBadge 
                 username={message.username} 
                 color={message.userColor || '#39ff14'}
                 isSystem={isSystem}
               />
+              )}
+              {!isSystem && (
               <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(typeof message.timestamp === 'number' ? message.timestamp : new Date(message.timestamp).getTime(), { addSuffix: true })}
               </span>
+              )}
             {!isSystem && onReplyClick && (
               <Button
                 variant="ghost"
@@ -136,7 +190,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
             )}
           </div>
             
-          <div className="pl-4">
+          <div className={cn("pl-4", isSystem && "pl-8")}>
             <p className={cn(
               "font-mono break-words text-sm md:text-base",
               isSystem ? "text-neon-green font-medium tracking-wide" : "text-foreground"

@@ -163,7 +163,7 @@ const ChatInterface: React.FC = () => {
     }
   }, [isFullscreen]);
 
-  // Add cooldown timer effect
+  // Remove the interval effect since we don't need it anymore
   useEffect(() => {
     if (cooldown > 0) {
       cooldownRef.current = setInterval(() => {
@@ -186,16 +186,16 @@ const ChatInterface: React.FC = () => {
   }, [cooldown]);
 
   // Format time remaining for mute
-  const formatMuteTime = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const formatMuteTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   // Update input placeholder based on mute status
   const getInputPlaceholder = () => {
     if (isMuted && muteTimeRemaining) {
-      return `You are muted. Time remaining: ${formatMuteTime(muteTimeRemaining)}`;
+      return `You are muted for ${formatMuteTime(muteTimeRemaining)}`;
     }
     if (!isMuted && cooldown > 0) {
       return `Please wait ${cooldown} seconds before sending another message`;
@@ -233,11 +233,11 @@ const ChatInterface: React.FC = () => {
     if (input.trim()) {
       const sent = await sendMessage(input, replyingTo);
       if (sent) {
-        if (soundEnabled) {
-          soundManager.playMessageSound();
-        }
+      if (soundEnabled) {
+        soundManager.playMessageSound();
+      }
         setInput('');
-        setReplyingTo(null);
+      setReplyingTo(null);
         // Only apply cooldown if user is not muted
         if (!isMuted) {
           setCooldown(5); // Start 5 second cooldown
@@ -452,13 +452,14 @@ const ChatInterface: React.FC = () => {
               )}
               <div className="flex gap-1 sm:gap-2 p-1 pb-2">
                 <Textarea
+                  key={`input-${isMuted}-${muteTimeRemaining}`}
                   ref={textareaRef}
                   value={input}
                   onChange={handleInput}
                   onKeyPress={handleKeyPress}
                   placeholder={getInputPlaceholder()}
-                  className={`flex-1 bg-gray-900 border-gray-800 text-white placeholder-gray-500 resize-none ${
-                    isMuted ? 'opacity-50 cursor-not-allowed' : ''
+                  className={`flex-1 bg-[#001100] border border-neon-green/30 text-neon-green placeholder-neon-green/50 resize-none focus:ring-1 focus:ring-neon-green/50 focus:border-neon-green/50 ${
+                    isMuted ? 'opacity-50 cursor-not-allowed border-red-500/30 text-red-500 placeholder-red-500/50' : ''
                   }`}
                   disabled={isMuted}
                   rows={1}
@@ -468,9 +469,9 @@ const ChatInterface: React.FC = () => {
                   disabled={!input.trim() || isMuted}
                   className={`${
                     isMuted 
-                      ? 'bg-red-600 hover:bg-red-700' 
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  } disabled:bg-gray-700 disabled:cursor-not-allowed`}
+                      ? 'bg-red-600/20 border-red-500/30 text-red-500 hover:bg-red-600/30' 
+                      : 'bg-[#001100] border border-neon-green/30 text-neon-green hover:bg-neon-green/20'
+                  } disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200`}
                 >
                   {getButtonText()}
                 </Button>
