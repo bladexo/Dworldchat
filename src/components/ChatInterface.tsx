@@ -76,26 +76,31 @@ const ChatInterface: React.FC = () => {
 
   // Enhanced viewport height management
   useEffect(() => {
+      let prevInnerHeight = window.innerHeight;
       let animationFrameId: number;
-      let prevViewportHeight = window.visualViewport?.height || window.innerHeight;
   
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      
-      const handleVisualViewportChange = () => {
-        const viewport = window.visualViewport;
-        if (!viewport || !isMobile || !isFullscreen) return;
   
-        // Prevent unnecessary updates in Brave
-        if (viewport.height === prevViewportHeight) return;
-        prevViewportHeight = viewport.height;
+      const handleResize = () => {
+        if (!isMobile || !isFullscreen) return;
+  
+        // Get new viewport height
+        const newInnerHeight = window.innerHeight;
+  
+        // Prevent unnecessary updates (for Brave)
+        if (newInnerHeight === prevInnerHeight) return;
+        prevInnerHeight = newInnerHeight;
   
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
   
         animationFrameId = requestAnimationFrame(() => {
-          const keyboardHeight = window.innerHeight - viewport.height;
+          const keyboardHeight = window.outerHeight - newInnerHeight; 
   
-          // Fixed positioning for stability
+          // Ensure page itself never scrolls
+          window.scrollTo(0, 0);
+  
+          // Fix chat window positioning
           if (chatWindowRef.current) {
             chatWindowRef.current.style.position = 'fixed';
             chatWindowRef.current.style.top = '0';
@@ -108,12 +113,12 @@ const ChatInterface: React.FC = () => {
           if (messageContainerRef.current) {
             const headerHeight = 48; // Header height
             const inputHeight = 56; // Input form height
-            const availableHeight = viewport.height - headerHeight - inputHeight;
+            const availableHeight = newInnerHeight - headerHeight - inputHeight;
             messageContainerRef.current.style.height = `${availableHeight}px`;
             messageContainerRef.current.style.overflowY = 'auto';
           }
   
-          // Form moves up with keyboard
+          // Adjust form position to move with keyboard
           if (formRef.current) {
             formRef.current.style.position = 'fixed';
             formRef.current.style.left = '0';
@@ -128,46 +133,44 @@ const ChatInterface: React.FC = () => {
       };
   
       if (isMobile && isFullscreen) {
-        window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
-        window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
-        handleVisualViewportChange();
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('scroll', handleResize);
+        handleResize();
         
         return () => {
           if (animationFrameId) cancelAnimationFrame(animationFrameId);
-          window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
-          window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
+          window.removeEventListener('resize', handleResize);
+          window.removeEventListener('scroll', handleResize);
         };
       }
-      
-      return undefined;
   }, [isMobile, isFullscreen]);
-
-// Cleanup when exiting fullscreen mode
-useEffect(() => {
-    if (!isFullscreen) {
-      if (chatWindowRef.current) {
-        chatWindowRef.current.style.position = '';
-        chatWindowRef.current.style.top = '';
-        chatWindowRef.current.style.left = '';
-        chatWindowRef.current.style.right = '';
-        chatWindowRef.current.style.bottom = '';
+  
+  // Cleanup when exiting fullscreen mode
+  useEffect(() => {
+      if (!isFullscreen) {
+        if (chatWindowRef.current) {
+          chatWindowRef.current.style.position = '';
+          chatWindowRef.current.style.top = '';
+          chatWindowRef.current.style.left = '';
+          chatWindowRef.current.style.right = '';
+          chatWindowRef.current.style.bottom = '';
+        }
+        
+        if (messageContainerRef.current) {
+          messageContainerRef.current.style.height = '';
+          messageContainerRef.current.style.overflowY = '';
+          messageContainerRef.current.style.paddingBottom = '60px';
+        }
+  
+        if (formRef.current) {
+          formRef.current.style.position = 'absolute';
+          formRef.current.style.bottom = '0';
+          formRef.current.style.left = '0';
+          formRef.current.style.right = '0';
+          formRef.current.style.paddingBottom = '4px';
+        }
       }
-      
-      if (messageContainerRef.current) {
-        messageContainerRef.current.style.height = '';
-        messageContainerRef.current.style.overflowY = '';
-        messageContainerRef.current.style.paddingBottom = '60px';
-      }
-
-      if (formRef.current) {
-        formRef.current.style.position = 'absolute';
-        formRef.current.style.bottom = '0';
-        formRef.current.style.left = '0';
-        formRef.current.style.right = '0';
-        formRef.current.style.paddingBottom = '4px';
-      }
-    }
-}, [isFullscreen]);
+  }, [isFullscreen]);
 
 
   // Remove the interval effect since we don't need it anymore
