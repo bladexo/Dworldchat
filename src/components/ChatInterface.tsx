@@ -74,9 +74,9 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Enhanced viewport height management
   useEffect(() => {
       let prevInnerHeight = window.innerHeight;
+      let keyboardOpen = false;
       let animationFrameId: number;
   
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
@@ -85,20 +85,26 @@ const ChatInterface: React.FC = () => {
       const handleResize = () => {
         if (!isMobile || !isFullscreen) return;
   
-        // Get new viewport height
         const newInnerHeight = window.innerHeight;
   
-        // Prevent unnecessary updates (for Brave)
-        if (newInnerHeight === prevInnerHeight) return;
+        // Detect if the keyboard is open
+        if (newInnerHeight < prevInnerHeight) {
+          keyboardOpen = true;
+        } else {
+          keyboardOpen = false;
+        }
+  
+        // Prevent excessive updates (for Brave)
+        if (keyboardOpen && newInnerHeight === prevInnerHeight) return;
         prevInnerHeight = newInnerHeight;
   
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
   
         animationFrameId = requestAnimationFrame(() => {
-          const keyboardHeight = window.outerHeight - newInnerHeight; 
+          const keyboardHeight = window.outerHeight - newInnerHeight;
   
-          // Ensure page itself never scrolls
-          window.scrollTo(0, 0);
+          // Prevent page scrolling when keyboard is open
+          if (keyboardOpen) window.scrollTo(0, 0);
   
           // Fix chat window positioning
           if (chatWindowRef.current) {
@@ -109,21 +115,21 @@ const ChatInterface: React.FC = () => {
             chatWindowRef.current.style.bottom = '0';
           }
   
-          // Adjust message container height
+          // Lock message container height
           if (messageContainerRef.current) {
-            const headerHeight = 48; // Header height
-            const inputHeight = 56; // Input form height
+            const headerHeight = 48;
+            const inputHeight = 56;
             const availableHeight = newInnerHeight - headerHeight - inputHeight;
             messageContainerRef.current.style.height = `${availableHeight}px`;
             messageContainerRef.current.style.overflowY = 'auto';
           }
   
-          // Adjust form position to move with keyboard
+          // Prevent input box from jumping up after message send
           if (formRef.current) {
             formRef.current.style.position = 'fixed';
             formRef.current.style.left = '0';
             formRef.current.style.right = '0';
-            formRef.current.style.bottom = `${keyboardHeight}px`;
+            formRef.current.style.bottom = keyboardOpen ? `${keyboardHeight}px` : '0';
             formRef.current.style.backgroundColor = '#000F00';
             if (isIOS) {
               formRef.current.style.paddingBottom = 'env(safe-area-inset-bottom)';
