@@ -188,7 +188,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
       timeout: 20000,
-      autoConnect: false // Don't connect automatically
+      autoConnect: true, // Enable auto-connect
+      path: '/socket.io/' // Explicitly set the path
     });
 
     // Set up event handlers before connecting
