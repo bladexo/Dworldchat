@@ -165,3 +165,137 @@
     overscroll-behavior: none;
   }
 }
+
+/* Premium theme styles that apply to the entire document */
+:root.theme-premium {
+  --page-bg: #ffffff;
+  --premium-accent: #3b82f6;
+  --premium-text: #1e40af;
+  --premium-border: rgba(59, 130, 246, 0.7);
+}
+
+/* Apply premium theme styles to the body */
+:root.theme-premium body {
+  background-color: var(--page-bg) !important;
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.03) 0%, transparent 50%);
+  color: var(--premium-text) !important;
+}
+
+/* Fix for premium theme to ensure black background is removed */
+body.premium-theme {
+  background-color: white !important;
+  background: white !important;
+  color: #1e40af !important;
+}
+
+:root.theme-premium .bg-black,
+:root.theme-premium .bg-hacker-dark,
+:root.theme-premium .bg-hacker-darker {
+  background-color: white !important;
+}
+
+/* Custom scrollbar for premium theme */
+:root.theme-premium ::-webkit-scrollbar-thumb {
+  background-color: var(--premium-accent);
+  opacity: 0.5;
+}
+
+:root.theme-premium ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--premium-accent);
+  opacity: 0.8;
+}
+
+:root.theme-premium ::-webkit-scrollbar-track {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Premium scan line effect */
+:root.theme-premium .scan-line-effect {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(59, 130, 246, 0.03) 50%,
+    transparent 100%
+  );
+  animation: scanline 10s linear infinite;
+}
+
+/* Premium theme body class */
+body.premium-theme {
+  background-color: white;
+}
+
+/* Premium theme modifications for chat window */
+:root.theme-premium .terminal-window {
+  box-shadow: 0 5px 30px rgba(59, 130, 246, 0.15),
+              0 0 10px rgba(59, 130, 246, 0.05),
+              inset 0 0 2px rgba(59, 130, 246, 0.1);
+  background: white !important;
+  border-color: rgba(59, 130, 246, 0.7) !important;
+}
+
+:root.theme-premium .message-container {
+  scrollbar-color: rgba(59, 130, 246, 0.5) rgba(59, 130, 246, 0.1);
+  background: white !important;
+}
+
+:root.theme-premium .terminal-body {
+  background-color: white !important;
+}
+
+:root.theme-premium .terminal-header {
+  background-color: #eff6ff !important;
+  border-bottom-color: rgba(59, 130, 246, 0.7) !important;
+}
+
+/* Premium theme text-shadow effect for headings */
+:root.theme-premium h1, 
+:root.theme-premium h2, 
+:root.theme-premium h3 {
+  text-shadow: 0 0 2px rgba(59, 130, 246, 0.3);
+  color: #1e40af !important;
+}
+
+/* Premium theme button styles */
+:root.theme-premium button {
+  transition: all 0.2s ease-in-out;
+}
+
+:root.theme-premium button:hover {
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Fix text visibility in premium theme */
+:root.theme-premium .text-blue-600 {
+  color: #1e40af !important;
+}
+
+:root.theme-premium .message-container p,
+:root.theme-premium .message-container span {
+  color: #1e3a8a !important;
+}
+
+:root.theme-premium .message-container .text-muted-foreground {
+  color: #475569 !important;
+}
+
+/* Make usernames and important content darker in premium theme */
+:root.theme-premium .username-badge {
+  color: #1e40af !important;
+}
+
+:root.theme-premium .message-item {
+  color: #1e3a8a !important;
+}
+
+:root.theme-premium .message-content {
+  color: #0f172a !important;
+}
+
+/* Ensure input text is clearly visible */
+:root.theme-premium textarea,
+:root.theme-premium input {
+  color: #1e40af !important;
+}

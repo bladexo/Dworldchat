@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChatMessage } from '@/context/ChatContext';
+import { useChat } from '@/context/ChatContext';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import UsernameBadge from './UsernameBadge';

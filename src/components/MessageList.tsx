@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ChatMessage, useChat } from '@/context/ChatContext';
 import { formatDistanceToNow } from 'date-fns';
-import { Reply, ChevronDown, ChevronUp } from 'lucide-react';
+import { Reply, ChevronDown, ChevronUp, ThumbsUp } from 'lucide-react';
 import { Button } from './ui/button';
 import UsernameBadge from './UsernameBadge';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,7 @@ interface MessageListProps {
 
 const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { currentUser } = useChat();
+  const { currentUser, sendMessageReaction, leaderboard } = useChat();
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
   // Add logging for messages updates
@@ -74,6 +74,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
     const isExpanded = expandedThreads.has(messageId);
     const displayedReplies = hasMoreThanThreeReplies && !isExpanded ? replies.slice(0, 3) : replies;
 
+    // Get champion username from leaderboard
+    const championUsername = leaderboard[0]?.username;
+
     // Function to format message content with blue mentions
     const formatMessageContent = (content: string) => {
       const mentionRegex = /@(\w+)/g;
@@ -86,6 +89,22 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
         return part;
       });
     };
+
+    // Function to handle like button click
+    const handleLike = () => {
+      if (currentUser && messageId) {
+        sendMessageReaction(messageId, 'thumbsup', message.roomId);
+      }
+    };
+
+    // Get the count of likes for this message
+    const getLikeCount = () => {
+      if (!message.reactions || !message.reactions['thumbsup']) return 0;
+      return message.reactions['thumbsup'].length;
+    };
+
+    const likeCount = getLikeCount();
+    const hasLiked = currentUser && message.reactions?.thumbsup?.includes(currentUser.username);
         
     return (
       <div key={messageId}>
@@ -171,6 +190,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
                 username={message.username} 
                 color={message.userColor || '#39ff14'}
                 isSystem={isSystem}
+                isChampion={message.username === championUsername}
               />
               )}
               {!isSystem && (
@@ -178,7 +198,28 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
               {formatDistanceToNow(typeof message.timestamp === 'number' ? message.timestamp : new Date(message.timestamp).getTime(), { addSuffix: true })}
               </span>
               )}
-            {!isSystem && onReplyClick && (
+            {!isSystem && (
+              <div className="flex items-center gap-1">
+                {/* Like button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-6 w-6",
+                    hasLiked 
+                      ? "text-blue-400 hover:text-blue-500" 
+                      : "text-muted-foreground hover:text-blue-400"
+                  )}
+                  onClick={handleLike}
+                >
+                  <div className="flex items-center">
+                    <ThumbsUp className="h-4 w-4" />
+                    {likeCount > 0 && <span className="text-xs ml-1">{likeCount}</span>}
+                  </div>
+                </Button>
+                
+                {/* Reply button */}
+                {onReplyClick && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -187,6 +228,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
               >
                 <Reply className="h-4 w-4" />
               </Button>
+                )}
+              </div>
             )}
           </div>
             

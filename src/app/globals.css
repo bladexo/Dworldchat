@@ -1,3 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes rotate-beam {
+  0% {
+    transform: rotate(0deg);
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 0.3;
+  }
+}
+
+@keyframes champion-pulse {
+  0% {
+    box-shadow: 0 0 10px currentColor,
+                0 0 20px currentColor,
+                0 0 30px currentColor;
+    opacity: 0.3;
+  }
+  50% {
+    box-shadow: 0 0 15px currentColor,
+                0 0 25px currentColor,
+                0 0 35px currentColor;
+    opacity: 0.6;
+  }
+  100% {
+    box-shadow: 0 0 10px currentColor,
+                0 0 20px currentColor,
+                0 0 30px currentColor;
+    opacity: 0.3;
+  }
+}
+
+@keyframes border-flow {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.05);
+    opacity: 0.6;
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    opacity: 0.3;
+  }
+}
+
+.champion-badge {
+  position: relative;
+  z-index: 1;
+}
+
+.champion-badge::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border: 2px solid currentColor;
+  border-radius: inherit;
+  opacity: 0.3;
+  animation: rotate-beam 3s linear infinite;
+}
+
+.champion-badge::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: inherit;
+  opacity: 0.2;
+  animation: champion-pulse 2s ease-in-out infinite;
+}
+
+.animate-border-flow {
+  animation: border-flow 3s ease-in-out infinite;
+}
+
 @keyframes borderFlow {
   0% {
     background-position: 200% 0;
