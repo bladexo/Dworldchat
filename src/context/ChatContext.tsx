@@ -114,7 +114,7 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const SOCKET_URL = import.meta.env.PROD 
-  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
+  ? 'https://bbbbbackky.vercel.app'
   : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Room storage - maps room codes to room data
