@@ -192,24 +192,37 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, [currentUser]);
 
   useEffect(() => {
+    // Configure Socket.IO with options designed for Vercel compatibility
     const newSocket = io(SOCKET_URL, {
       withCredentials: true,
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // Polling first, then upgrade to WebSocket
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-      timeout: 20000,
+      reconnectionAttempts: 10,
+      timeout: 30000,
       autoConnect: true,
-      path: '/socket.io/'
+      forceNew: true, // Force a new connection
+      path: '/socket.io/',
+      extraHeaders: { // Add extra headers for authentication
+        'X-Client-Version': '1.0.0',
+        'X-Client-Platform': 'web'
+      }
+    });
+
+    // Enhanced error logging
+    newSocket.io.on("error", (error) => {
+      console.error("Socket.IO manager error:", error);
+      toast.error(`Connection manager error: ${error.message}`);
     });
 
     // Connection debugging
     newSocket.on('connect', () => {
-      console.log('Socket connected with ID:', newSocket.id);
+      console.log(`Socket connected with ID: ${newSocket.id} using transport: ${newSocket.io.engine.transport.name}`);
       console.log('Connected to backend at:', SOCKET_URL);
       setIsConnected(true);
       setIsReconnecting(false);
       setReconnectAttempts(0);
+      setConnectionError(null);
       
       // Re-register if we have an existing user
       if (currentUser) {
@@ -238,8 +251,15 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     newSocket.on('connect_error', (error) => {
       console.error('Connection error:', error);
+      console.error('Connection error details:', JSON.stringify(error, null, 2));
       setConnectionError(`Connection error: ${error.message}`);
       toast.error(`Socket connection error: ${error.message}. Retrying...`);
+      
+      // Try to switch to polling if websocket fails
+      if (newSocket.io.engine.transport.name === 'websocket') {
+        console.log('Trying to switch to polling transport...');
+        newSocket.io.engine.transport.close();
+      }
     });
 
     newSocket.on('disconnect', (reason) => {
