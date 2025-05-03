@@ -113,9 +113,19 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
+// Configure backend URLs for different environments
+const BACKEND_URLS = {
+  vercel: 'https://bbbbbackky.vercel.app',
+  netlify: 'https://bbbbbackky.netlify.app',
+  local: 'http://localhost:8000'
+};
+
+// Select the appropriate URL based on environment
 const SOCKET_URL = import.meta.env.PROD 
-  ? 'https://bbbbbackky.vercel.app'
-  : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
+  ? (import.meta.env.VITE_USE_NETLIFY === 'true' ? BACKEND_URLS.netlify : BACKEND_URLS.vercel)
+  : (import.meta.env.VITE_SERVER_URL || BACKEND_URLS.local);
+
+console.log('Using backend URL:', SOCKET_URL);
 
 // Room storage - maps room codes to room data
 // This is kept in memory to maintain room metadata across joins
@@ -145,6 +155,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Add reconnection state
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   
   // Room state
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
@@ -188,13 +199,14 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
       timeout: 20000,
-      autoConnect: true, // Enable auto-connect
-      path: '/socket.io/' // Explicitly set the path
+      autoConnect: true,
+      path: '/socket.io/'
     });
 
-    // Set up event handlers before connecting
+    // Connection debugging
     newSocket.on('connect', () => {
-      console.log('Connected to server with socket ID:', newSocket.id);
+      console.log('Socket connected with ID:', newSocket.id);
+      console.log('Connected to backend at:', SOCKET_URL);
       setIsConnected(true);
       setIsReconnecting(false);
       setReconnectAttempts(0);
@@ -222,6 +234,12 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
           newSocket.emit('join', currentRoom.id);
         }
       }
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      setConnectionError(`Connection error: ${error.message}`);
+      toast.error(`Socket connection error: ${error.message}. Retrying...`);
     });
 
     newSocket.on('disconnect', (reason) => {
