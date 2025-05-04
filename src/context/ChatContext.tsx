@@ -113,19 +113,9 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-// Configure backend URLs for different environments
-const BACKEND_URLS = {
-  vercel: 'https://bbbbbackky.vercel.app',
-  netlify: 'https://bbbbbackky.netlify.app',
-  local: 'http://localhost:8000'
-};
-
-// Select the appropriate URL based on environment
 const SOCKET_URL = import.meta.env.PROD 
-  ? (import.meta.env.VITE_USE_NETLIFY === 'true' ? BACKEND_URLS.netlify : BACKEND_URLS.vercel)
-  : (import.meta.env.VITE_SERVER_URL || BACKEND_URLS.local);
-
-console.log('Using backend URL:', SOCKET_URL);
+  ? 'https://nutty-annabell-loganrustyy-25293412.koyeb.app'
+  : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Room storage - maps room codes to room data
 // This is kept in memory to maintain room metadata across joins
@@ -155,7 +145,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Add reconnection state
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
   
   // Room state
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
@@ -192,37 +181,22 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, [currentUser]);
 
   useEffect(() => {
-    // Configure Socket.IO with options designed for Vercel compatibility
     const newSocket = io(SOCKET_URL, {
       withCredentials: true,
-      transports: ['polling', 'websocket'], // Polling first, then upgrade to WebSocket
+      transports: ['websocket', 'polling'],
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 10,
-      timeout: 30000,
-      autoConnect: true,
-      forceNew: true, // Force a new connection
-      path: '/socket.io/',
-      extraHeaders: { // Add extra headers for authentication
-        'X-Client-Version': '1.0.0',
-        'X-Client-Platform': 'web'
-      }
+      reconnectionAttempts: 5,
+      timeout: 20000,
+      autoConnect: false // Don't connect automatically
     });
 
-    // Enhanced error logging
-    newSocket.io.on("error", (error) => {
-      console.error("Socket.IO manager error:", error);
-      toast.error(`Connection manager error: ${error.message}`);
-    });
-
-    // Connection debugging
+    // Set up event handlers before connecting
     newSocket.on('connect', () => {
-      console.log(`Socket connected with ID: ${newSocket.id} using transport: ${newSocket.io.engine.transport.name}`);
-      console.log('Connected to backend at:', SOCKET_URL);
+      console.log('Connected to server with socket ID:', newSocket.id);
       setIsConnected(true);
       setIsReconnecting(false);
       setReconnectAttempts(0);
-      setConnectionError(null);
       
       // Re-register if we have an existing user
       if (currentUser) {
@@ -246,19 +220,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
           console.log('Rejoining room after reconnection:', currentRoom.name);
           newSocket.emit('join', currentRoom.id);
         }
-      }
-    });
-
-    newSocket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
-      console.error('Connection error details:', JSON.stringify(error, null, 2));
-      setConnectionError(`Connection error: ${error.message}`);
-      toast.error(`Socket connection error: ${error.message}. Retrying...`);
-      
-      // Try to switch to polling if websocket fails
-      if (newSocket.io.engine.transport.name === 'websocket') {
-        console.log('Trying to switch to polling transport...');
-        newSocket.io.engine.transport.close();
       }
     });
 
