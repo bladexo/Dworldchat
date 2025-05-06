@@ -127,12 +127,13 @@ interface ChatContextType {
     maxUsages: number | null;
   } | null;
   executeHack: (targetMode?: 'random' | 'specific', targetUsername?: string) => Promise<{ success: boolean; stolenPoints: number; victims: string[] }>;
+  checkConnectionAndReconnect: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-const SOCKET_URL = import.meta.env
-  ? 'https://nutty-annabell-loganrustyy-25293412.koyeb.app'
+const SOCKET_URL = import.meta.env.PROD 
+  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
   : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Log socket configuration 
@@ -335,8 +336,10 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       reconnectionDelayMax: 5000,
       reconnectionAttempts: Infinity,
       timeout: 20000,
-      autoConnect: false,
-      forceNew: false
+      autoConnect: true, // Change to true to connect automatically
+      forceNew: false,
+      // Add these critical reconnection options
+      reconnection: true, // Ensure reconnection is enabled
     });
 
     // Set up ping interval
@@ -372,7 +375,39 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       logDebug('Received pong from server');
     });
 
-    // Add disconnect handler with immediate reconnection
+    // Add reconnect attempt handler to track reconnection progress
+    newSocket.io.on('reconnect_attempt', (attempt) => {
+      logDebug(`Socket reconnect attempt #${attempt}`);
+      setIsReconnecting(true);
+      setReconnectAttempts(attempt);
+      
+      // Show notification on first and fifth attempts
+      if (attempt === 1) {
+        toast.error('Connection lost. Attempting to reconnect...', {
+          duration: 4000
+        });
+      } else if (attempt === 5) {
+        toast.error('Still trying to reconnect...', {
+          duration: 4000
+        });
+      }
+    });
+
+    // Add reconnect success handler
+    newSocket.io.on('reconnect', () => {
+      logDebug('Socket reconnected successfully');
+      setIsReconnecting(false);
+      
+      // Re-register user if we have one
+      if (currentUser) {
+        logDebug('Re-registering user after reconnection success', currentUser.username);
+        registerUserWithServer(newSocket, currentUser);
+      }
+      
+      toast.success('Connection restored!', { duration: 3000 });
+    });
+
+    // Add disconnect handler
     newSocket.on('disconnect', (reason) => {
       logDebug('Socket DISCONNECTED', { reason, socketId: newSocket.id });
       setIsConnected(false);
@@ -390,80 +425,20 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
 
     // Start the connection
-    newSocket.connect();
+    if (!newSocket.connected) {
+      newSocket.connect();
+    }
     setSocket(newSocket);
 
     return () => {
       logDebug('Socket cleanup on component unmount');
       if (pingInterval) {
-      clearInterval(pingInterval);
+        clearInterval(pingInterval);
       }
       newSocket.removeAllListeners();
       newSocket.close();
     };
   }, []); // Empty dependency array to prevent recreation
-
-  // Add recovery mechanism for when connection is lost
-  useEffect(() => {
-    if (socket && !isConnected && currentUser && !isReconnecting) {
-      setIsReconnecting(true);
-      logDebug('Starting reconnection process');
-      
-      let reconnectAttempt = 0;
-      const maxReconnectAttempts = 10;
-      
-      const reconnectInterval = setInterval(() => {
-        if (socket.connected) {
-          logDebug('Connection restored');
-          clearInterval(reconnectInterval);
-          setIsReconnecting(false);
-          setReconnectAttempts(0);
-          
-          // Re-register user after reconnection
-          if (currentUser) {
-            registerUserWithServer(socket, currentUser);
-          }
-          
-          return;
-        }
-        
-        reconnectAttempt++;
-        setReconnectAttempts(reconnectAttempt);
-        
-        // Show notification about reconnection attempt
-        if (reconnectAttempt === 1) {
-          // First attempt notification
-          toast.error('Connection lost. Attempting to reconnect...', {
-            duration: 4000
-          });
-        } else if (reconnectAttempt === 5) {
-          // Fifth attempt notification
-          toast.error('Still trying to reconnect...', {
-            duration: 4000
-          });
-        } else if (reconnectAttempt >= maxReconnectAttempts) {
-          // Max attempts reached
-          toast.error('Could not reconnect. Please refresh the page.', {
-            duration: 10000
-          });
-          clearInterval(reconnectInterval);
-          setIsReconnecting(false);
-          return;
-        }
-        
-        // Exponential backoff: wait longer between attempts
-        const backoffTime = Math.min(3000 * Math.pow(1.5, reconnectAttempt - 1), 20000);
-        logDebug(`Reconnection attempt ${reconnectAttempt}/${maxReconnectAttempts} (next attempt in ${Math.round(backoffTime/1000)}s)`);
-        
-        // Try to reconnect
-        if (!socket.connected) {
-          socket.connect();
-        }
-      }, 3000); // First attempt after 3 seconds
-
-      return () => clearInterval(reconnectInterval);
-    }
-  }, [socket, isConnected, currentUser, isReconnecting, registerUserWithServer]);
 
   // Validate message
   const validateMessage = (content: string): boolean => {
@@ -658,12 +633,15 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
     setLastMessageTime(now);
 
-    logDebug('Emitting chat_message event', {
-      content,
-      senderId: currentUser.id,
-      senderUsername: currentUser.username
-    });
-
+    // Check registration status before sending
+    socket.emit('check_registration', { username: currentUser.username }, (response: { registered: boolean }) => {
+      if (!response.registered) {
+        logDebug('User not registered, attempting to re-register before sending message');
+        registerUserWithServer(socket, currentUser);
+        
+        // Wait a moment for registration to complete, then try sending again
+        setTimeout(() => {
+          logDebug('Retrying message send after registration');
     socket.emit('chat_message', {
       content,
       senderId: currentUser.id,
@@ -675,9 +653,33 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         content: replyTo.content
       } : undefined
     });
+        }, 1000);
+        
+        return;
+      }
+      
+      // User is registered, send the message
+      logDebug('Emitting chat_message event', {
+        content,
+        senderId: currentUser.id,
+        senderUsername: currentUser.username
+      });
+
+      socket.emit('chat_message', {
+        content,
+        senderId: currentUser.id,
+        senderUsername: currentUser.username,
+        userColor: currentUser.color,
+        replyTo: replyTo ? {
+          id: replyTo.id,
+          username: replyTo.username,
+          content: replyTo.content
+        } : undefined
+      });
+    });
     
     return true;
-  }, [socket, currentUser, lastMessageTime, muteInfo, validateMessage]);
+  }, [socket, currentUser, lastMessageTime, muteInfo, validateMessage, registerUserWithServer]);
 
   // Room Functions
   const createRoom = useCallback(async (name: string, theme: RoomTheme): Promise<Room> => {
@@ -1144,28 +1146,52 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       if (error === 'Not registered' && currentUser) {
         logDebug('Received "Not registered" error. Attempting to re-register user.');
         
-        // Re-register with server with the persistent identity
-        if (currentUser.identity) {
-          registerUserWithServer(socket, currentUser);
-        } else {
-          // If we don't have an identity, create a new one
-          const identity = `identity_${Math.random().toString(36).substr(2, 9)}`;
-          const updatedUser = {
-            ...currentUser,
-            identity
-          };
-          
-          // Save the new identity
-          try {
-            saveIdentity(identity);
-            saveUser(updatedUser);
-            setCurrentUser(updatedUser);
-            registerUserWithServer(socket, updatedUser);
-          } catch (e) {
-            console.error('Failed to save identity during re-registration:', e);
+        // Check if we're actually registered first
+        socket.emit('check_registration', { username: currentUser.username }, (response: { registered: boolean }) => {
+          if (response && response.registered) {
+            logDebug('User is actually registered, ignoring error');
+            return;
           }
-        }
+          
+          logDebug('User is not registered, attempting to re-register');
+          
+          // Re-register with server with the persistent identity
+          if (currentUser.identity) {
+            // Ensure we're connected before attempting to register
+            if (socket.connected) {
+              registerUserWithServer(socket, currentUser);
+            } else {
+              logDebug('Socket not connected, waiting for reconnection before re-registering');
+              // Will be handled by the connect event handler
+            }
+          } else {
+            // If we don't have an identity, create a new one
+            const identity = `identity_${Math.random().toString(36).substr(2, 9)}`;
+            const updatedUser = {
+              ...currentUser,
+              identity
+            };
+            
+            // Save the new identity
+            try {
+              saveIdentity(identity);
+              saveUser(updatedUser);
+              setCurrentUser(updatedUser);
+              
+              if (socket.connected) {
+                registerUserWithServer(socket, updatedUser);
+              }
+            } catch (e) {
+              console.error('Failed to save identity during re-registration:', e);
+            }
+          }
+        });
       }
+    });
+
+    // Add handler for registration confirmation
+    socket.on('registration_confirmed', () => {
+      logDebug('Registration confirmed by server');
     });
 
     // Status check every 5 seconds
@@ -1464,7 +1490,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       
       // Set up a listener for the hack_completed event to resolve the promise
       const handleHackCompleted = (response: { 
-        success: boolean; 
+        success: boolean;
         message?: string;
         stolenPoints?: number;
         victims?: string[];
@@ -1577,6 +1603,40 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }, [roomMessages]);
 
+  // Add a function to check connection status and reconnect if needed
+  const checkConnectionAndReconnect = useCallback(() => {
+    logDebug('Checking connection status', { 
+      socketExists: !!socket, 
+      isConnected: socket?.connected || false 
+    });
+    
+    if (socket && !socket.connected) {
+      logDebug('Socket exists but not connected, attempting to reconnect');
+      socket.connect();
+      
+      // Verify connection after a delay
+      setTimeout(() => {
+        if (socket.connected) {
+          logDebug('Reconnection successful');
+          setIsConnected(true);
+          
+          // Re-register if we have a user
+          if (currentUser) {
+            registerUserWithServer(socket, currentUser);
+          }
+        } else {
+          logDebug('Reconnection failed');
+          toast.error('Unable to connect to chat server. Please refresh the page.');
+        }
+      }, 2000);
+    } else if (!socket) {
+      logDebug('No socket instance exists');
+      toast.error('Chat connection not initialized. Please refresh the page.');
+    } else {
+      logDebug('Socket is already connected');
+    }
+  }, [socket, currentUser, registerUserWithServer]);
+
   const value: ChatContextType = {
     messages,
     currentUser,
@@ -1608,7 +1668,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // Add hack-related properties
     hasHackAccess,
     hackAccessInfo,
-    executeHack
+    executeHack,
+    checkConnectionAndReconnect
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
