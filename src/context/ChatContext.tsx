@@ -6,8 +6,18 @@ import { Notification } from '@/components/NotificationFeed';
 import { debounce } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 
+// DEBUG CONFIG - SET TO TRUE TO ENABLE VERBOSE LOGGING
+const DEBUG_MODE = true;
+const logDebug = (...args: any[]) => {
+  if (DEBUG_MODE) {
+    console.log('[DEBUG]', ...args);
+  }
+};
+
 // Constants
 const MAX_MESSAGES = 100; // Maximum number of messages to keep in history
+const RECONNECT_MAX_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+const RECONNECT_INTERVAL = 3000; // 3 seconds
 
 // Room themes
 export type RoomTheme = 'terminal' | 'cyberpunk' | 'retro' | 'minimal' | 'hacker' | 'premium';
@@ -62,6 +72,7 @@ export interface User {
   username: string;
   color: string;
   muteInfo?: MuteInfo;
+  identity?: string; // Added identity field for persistent identification
 }
 
 // Define the leaderboard stats type
@@ -89,6 +100,8 @@ interface ChatContextType {
   muteTimeRemaining: number;
   socket: Socket | null;
   currentUserPoints: number;
+  isReconnecting: boolean;  // Add reconnection status
+  reconnectAttempts: number; // Add reconnection attempts
   
   // Room related functions and state
   currentRoom: Room | null;
@@ -108,14 +121,22 @@ interface ChatContextType {
   };
   // Add hack-related properties
   hasHackAccess: boolean;
-  executeHack: () => Promise<{ success: boolean; stolenPoints: number; victims: string[] }>;
+  hackAccessInfo: {
+    type: string;
+    usageCount: number;
+    maxUsages: number | null;
+  } | null;
+  executeHack: (targetMode?: 'random' | 'specific', targetUsername?: string) => Promise<{ success: boolean; stolenPoints: number; victims: string[] }>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const SOCKET_URL = import.meta.env.PROD 
-  ? 'https://nutty-annabell-loganrustyy-25293412.koyeb.app'
+  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
   : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
+
+// Log socket configuration 
+console.log('[SOCKET CONFIG] Using server URL:', SOCKET_URL, 'Environment:', import.meta.env.MODE);
 
 // Room storage - maps room codes to room data
 // This is kept in memory to maintain room metadata across joins
@@ -123,7 +144,24 @@ const roomRegistry = new Map<string, Room>();
 
 // Constants
 const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_INTERVAL = 3000; // 3 seconds
+const SOCKET_CONFIG = {
+  withCredentials: true,
+  transports: ['websocket', 'polling'],
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  reconnectionAttempts: 10,
+  timeout: 20000,
+  autoConnect: false, // Don't connect automatically
+  forceNew: false,
+  // Add specific timeouts to prevent premature disconnects
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  // Add upgrade transport options
+  upgrade: true,
+  rememberUpgrade: true,
+  // Add additional options for stability
+  rejectUnauthorized: false
+};
 
 // Provider component
 export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
@@ -159,10 +197,19 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     averageMessagesPerUser: 0
   });
 
-  // Set hack access to true by default for everyone
-  const [hasHackAccess, setHasHackAccess] = useState<boolean>(true);
+  // Set hack access state
+  const [hasHackAccess, setHasHackAccess] = useState<boolean>(false);
+  const [hackAccessInfo, setHackAccessInfo] = useState<{
+    type: string;
+    usageCount: number;
+    maxUsages: number | null;
+  } | null>(null);
 
   const [currentUserPoints, setCurrentUserPoints] = useState<number>(0);
+
+  // Add connection stability monitoring
+  const disconnectCount = useRef(0);
+  const lastDisconnectTime = useRef(Date.now());
 
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     if (!currentUser) return;
@@ -180,135 +227,269 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }, 5000);
   }, [currentUser]);
 
+  // Helper function to get stored user identity from sessionStorage
+  const getStoredIdentity = () => {
+    try {
+      return sessionStorage.getItem('chat_identity');
+    } catch (error) {
+      console.error('Error accessing sessionStorage:', error);
+      return null;
+    }
+  };
+
+  // Helper function to save user identity to sessionStorage
+  const saveIdentity = (identity: string) => {
+    try {
+      sessionStorage.setItem('chat_identity', identity);
+    } catch (error) {
+      console.error('Error saving to sessionStorage:', error);
+    }
+  };
+
+  // Helper function to get stored user from sessionStorage
+  const getStoredUser = () => {
+    try {
+      const storedUser = sessionStorage.getItem('chat_user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error('Error accessing sessionStorage:', error);
+      return null;
+    }
+  };
+
+  // Helper function to save user to sessionStorage
+  const saveUser = (user: User) => {
+    try {
+      sessionStorage.setItem('chat_user', JSON.stringify(user));
+    } catch (error) {
+      console.error('Error saving to sessionStorage:', error);
+    }
+  };
+
+  // Register user with server
+  const registerUserWithServer = useCallback((socket: Socket, user: User) => {
+    logDebug('Registering user with server', { 
+      username: user.username, 
+      socketId: socket.id, 
+      socketConnected: socket.connected,
+      userIdentity: user.identity
+    });
+    
+    if (!socket.connected) {
+      console.warn('Socket not connected when attempting to register user');
+      return;
+    }
+    
+    socket.emit('register_user', { 
+      identity: user.identity,
+      username: user.username,
+      color: user.color,
+      publicKey: 'dummy-key-' + Math.random().toString(36).substr(2, 9)
+    });
+    
+    // Verify registration after a delay
+    setTimeout(() => {
+      if (socket.connected) {
+        logDebug('Checking registration status');
+        socket.emit('ping');
+      } else {
+        logDebug('Socket disconnected after registration attempt');
+      }
+    }, 1000);
+  }, []);
+
+  // Helper function to clear stored session data
+  const clearSessionData = useCallback(() => {
+    try {
+      sessionStorage.removeItem('chat_identity');
+      sessionStorage.removeItem('chat_user');
+      console.log('Session data cleared');
+    } catch (error) {
+      console.error('Error clearing sessionStorage:', error);
+    }
+  }, []);
+
+  // Add event listener for page unload to differentiate between refresh and reconnect
   useEffect(() => {
+    // Setup event listener to clear session on page unload
+    const handleBeforeUnload = () => {
+      console.log('Page is being unloaded - clearing socket.io data');
+      // Mark this as a page reload/closure, not a disconnect
+      sessionStorage.removeItem('pageLoadTimestamp');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    logDebug('Initializing socket connection to:', SOCKET_URL);
+    
     const newSocket = io(SOCKET_URL, {
       withCredentials: true,
       transports: ['websocket', 'polling'],
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       timeout: 20000,
-      autoConnect: false // Don't connect automatically
+      autoConnect: false,
+      forceNew: false
     });
 
-    // Set up event handlers before connecting
+    // Set up ping interval
+    let pingInterval: NodeJS.Timeout;
+    
+    // Add connection handler
     newSocket.on('connect', () => {
-      console.log('Connected to server with socket ID:', newSocket.id);
+      logDebug('Socket CONNECTED', { 
+        id: newSocket.id, 
+        transport: newSocket.io?.engine?.transport?.name || 'unknown'
+      });
       setIsConnected(true);
       setIsReconnecting(false);
       setReconnectAttempts(0);
       
-      // Re-register if we have an existing user
-      if (currentUser) {
-        console.log('Re-registering existing user after reconnection:', currentUser.username);
-        // Update the user's ID to match the new socket
-        const updatedUser = {
-          ...currentUser,
-          id: newSocket.id
-        };
-        setCurrentUser(updatedUser);
-        
-        // Re-register with the server
-        newSocket.emit('register', {
-          username: currentUser.username,
-          color: currentUser.color,
-          publicKey: 'dummy-key-' + Math.random().toString(36).substr(2, 9)
-        });
-        
-        // Rejoin room if was in a room
-        if (currentRoom) {
-          console.log('Rejoining room after reconnection:', currentRoom.name);
-          newSocket.emit('join', currentRoom.id);
+      // Start sending pings regularly
+      pingInterval = setInterval(() => {
+        if (newSocket.connected) {
+          logDebug('Sending ping to server');
+          newSocket.emit('ping');
         }
+      }, 20000); // Send ping every 20 seconds
+      
+      // Re-register user if we have one
+      if (currentUser) {
+        logDebug('Re-registering user after reconnection', currentUser.username);
+        registerUserWithServer(newSocket, currentUser);
       }
     });
 
+    // Handle pong responses
+    newSocket.on('pong', () => {
+      logDebug('Received pong from server');
+    });
+
+    // Add disconnect handler with immediate reconnection
     newSocket.on('disconnect', (reason) => {
-      console.log('Disconnected from server. Reason:', reason);
+      logDebug('Socket DISCONNECTED', { reason, socketId: newSocket.id });
       setIsConnected(false);
       
-      // If the disconnection wasn't intentional, try to reconnect
-      if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'ping timeout') {
-        setIsReconnecting(true);
-        
-        // Implement exponential backoff for reconnection
-        const attemptReconnect = () => {
-          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.log('Max reconnection attempts reached');
-            setIsReconnecting(false);
-            toast.error('Could not reconnect to server. Please refresh the page.');
-            return;
-          }
-
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000); // Exponential backoff with 10s max
-          console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
-          
-          setTimeout(() => {
-            if (!newSocket.connected) {
-              setReconnectAttempts(prev => prev + 1);
-              newSocket.connect();
-            }
-          }, delay);
-        };
-
-        attemptReconnect();
+      // Clear ping interval on disconnect
+      if (pingInterval) {
+        clearInterval(pingInterval);
       }
       
-      toast.error('Disconnected from server. Attempting to reconnect...');
-    });
-
-    // Add ping/pong to keep connection alive
-    const pingInterval = setInterval(() => {
-      if (newSocket.connected) {
-        newSocket.emit('ping');
-      }
-    }, 25000);
-
-    newSocket.on('pong', () => {
-      console.log('Received pong from server');
-    });
-
-    // Handle registration errors
-    newSocket.on('error', (error) => {
-      console.log('Socket error:', error);
-      if (error === 'Not registered' && currentUser) {
-        console.log('Attempting to re-register user after error:', currentUser.username);
-        newSocket.emit('register', {
-          username: currentUser.username,
-          color: currentUser.color,
-          publicKey: 'dummy-key-' + Math.random().toString(36).substr(2, 9)
-        });
+      // If server initiated disconnect or transport close, try to reconnect immediately
+      if (reason === 'io server disconnect' || reason === 'transport close') {
+        logDebug('Server initiated disconnect, attempting immediate reconnection');
+        newSocket.connect();
       }
     });
 
-    // Initial connection attempt
+    // Start the connection
     newSocket.connect();
     setSocket(newSocket);
 
     return () => {
+      logDebug('Socket cleanup on component unmount');
+      if (pingInterval) {
       clearInterval(pingInterval);
+      }
+      newSocket.removeAllListeners();
       newSocket.close();
     };
-  }, []); // Remove dependencies to prevent recreation of socket
+  }, []); // Empty dependency array to prevent recreation
 
-  // Add recovery mechanism for when frontend starts before backend
+  // Add recovery mechanism for when connection is lost
   useEffect(() => {
     if (socket && !isConnected && currentUser && !isReconnecting) {
-      const checkConnection = setInterval(() => {
+      setIsReconnecting(true);
+      logDebug('Starting reconnection process');
+      
+      let reconnectAttempt = 0;
+      const maxReconnectAttempts = 10;
+      
+      const reconnectInterval = setInterval(() => {
+        if (socket.connected) {
+          logDebug('Connection restored');
+          clearInterval(reconnectInterval);
+          setIsReconnecting(false);
+          setReconnectAttempts(0);
+          
+          // Re-register user after reconnection
+          if (currentUser) {
+            registerUserWithServer(socket, currentUser);
+          }
+          
+          return;
+        }
+        
+        reconnectAttempt++;
+        setReconnectAttempts(reconnectAttempt);
+        
+        // Show notification about reconnection attempt
+        if (reconnectAttempt === 1) {
+          // First attempt notification
+          toast.error('Connection lost. Attempting to reconnect...', {
+            duration: 4000
+          });
+        } else if (reconnectAttempt === 5) {
+          // Fifth attempt notification
+          toast.error('Still trying to reconnect...', {
+            duration: 4000
+          });
+        } else if (reconnectAttempt >= maxReconnectAttempts) {
+          // Max attempts reached
+          toast.error('Could not reconnect. Please refresh the page.', {
+            duration: 10000
+          });
+          clearInterval(reconnectInterval);
+          setIsReconnecting(false);
+          return;
+        }
+        
+        // Exponential backoff: wait longer between attempts
+        const backoffTime = Math.min(3000 * Math.pow(1.5, reconnectAttempt - 1), 20000);
+        logDebug(`Reconnection attempt ${reconnectAttempt}/${maxReconnectAttempts} (next attempt in ${Math.round(backoffTime/1000)}s)`);
+        
+        // Try to reconnect
         if (!socket.connected) {
-          console.log('Checking connection status...');
           socket.connect();
         }
-      }, 5000);
+      }, 3000); // First attempt after 3 seconds
 
-      return () => clearInterval(checkConnection);
+      return () => clearInterval(reconnectInterval);
     }
-  }, [socket, isConnected, currentUser, isReconnecting]);
+  }, [socket, isConnected, currentUser, isReconnecting, registerUserWithServer]);
 
+  // Validate message
   const validateMessage = (content: string): boolean => {
-    if (!content || typeof content !== 'string') return false;
-    if (content.length > 1000) return false;
-    if (content.trim().length === 0) return false;
+    logDebug('Validating message', { 
+      content, 
+      length: content?.length, 
+      type: typeof content,
+      trimmedLength: content?.trim()?.length
+    });
+    
+    if (!content || typeof content !== 'string') {
+      logDebug('Message validation failed: content is empty or not a string');
+      return false;
+    }
+    
+    if (content.length > 1000) {
+      logDebug('Message validation failed: content too long', content.length);
+      return false;
+    }
+    
+    if (content.trim().length === 0) {
+      logDebug('Message validation failed: content is only whitespace');
+      return false;
+    }
+    
+    logDebug('Message validation passed');
     return true;
   };
 
@@ -321,32 +502,46 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   // Create user
   const createUser = useCallback(() => {
+    logDebug('createUser called', { 
+      socketExists: !!socket, 
+      isConnected, 
+      socketId: socket?.id 
+    });
+    
     if (!socket || !isConnected) {
       toast.error('Waiting for server connection...');
       return;
     }
 
+    // Generate a random identity if we don't have one
+    const identity = getStoredIdentity() || `identity_${Math.random().toString(36).substr(2, 9)}`;
     const username = `user_${Math.random().toString(36).substr(2, 6)}`;
     const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
-    const publicKey = 'dummy-key-' + Math.random().toString(36).substr(2, 9);
     
-    console.log('Creating new user:', { username, color });
+    logDebug('Creating new user:', { username, color, identity, socketId: socket.id });
     
+    // Save identity in session storage
+    saveIdentity(identity);
+    
+    // Create user object
     const user: User = {
       id: socket.id,
       username,
-      color
+      color,
+      identity
     };
-
-    socket.emit('register', {
-      username: user.username,
-      color: user.color,
-      publicKey
-    });
     
+    // Save user in session storage
+    saveUser(user);
+    
+    // Set user in state
     setCurrentUser(user);
-    toast.success(`Welcome, ${username}!`);
-  }, [socket, isConnected]);
+    
+    // Register with server (will handle welcome notification)
+    registerUserWithServer(socket, user);
+    
+    // Removed local toast since the server will send a welcome notification
+  }, [socket, isConnected, registerUserWithServer, getStoredIdentity, saveIdentity]);
 
   // Update mute check interval to use refs and avoid render updates
   useEffect(() => {
@@ -429,23 +624,45 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   }, [socket, currentUser]);
 
+  // Send message
   const sendMessage = useCallback((content: string, replyTo?: ChatMessage): boolean => {
-    if (!socket || !currentUser) return false;
+    logDebug('sendMessage called', { 
+      content, 
+      hasCurrentUser: !!currentUser, 
+      hasSocket: !!socket,
+      socketConnected: socket?.connected,
+      isMuted: !!muteInfo && Date.now() < muteInfo.muteUntil,
+      cooldown: MESSAGE_COOLDOWN - (Date.now() - lastMessageTime)
+    });
+    
+    if (!socket || !currentUser) {
+      logDebug('Cannot send message: no socket or user');
+      return false;
+    }
     
     if (muteInfo && Date.now() < muteInfo.muteUntil) {
+      logDebug('Cannot send message: user is muted');
       return false;
     }
     
     if (!validateMessage(content)) {
+      logDebug('Cannot send message: validation failed');
       return false;
     }
 
     const now = Date.now();
     const timeLeft = MESSAGE_COOLDOWN - (now - lastMessageTime);
     if (timeLeft > 0) {
+      logDebug('Cannot send message: cooldown active, time left:', timeLeft);
       return false;
     }
     setLastMessageTime(now);
+
+    logDebug('Emitting chat_message event', {
+      content,
+      senderId: currentUser.id,
+      senderUsername: currentUser.username
+    });
 
     socket.emit('chat_message', {
       content,
@@ -458,8 +675,9 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         content: replyTo.content
       } : undefined
     });
+    
     return true;
-  }, [socket, currentUser, lastMessageTime, muteInfo]);
+  }, [socket, currentUser, lastMessageTime, muteInfo, validateMessage]);
 
   // Room Functions
   const createRoom = useCallback(async (name: string, theme: RoomTheme): Promise<Room> => {
@@ -766,14 +984,25 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const sendRoomMessage = useCallback(
     (content: string, replyTo?: ChatMessage): boolean => {
+      console.log('[DEBUG] sendRoomMessage called with:', { content, currentUser: !!currentUser, currentRoom: !!currentRoom, socket: !!socket });
       if (!socket || !currentUser || !currentRoom) return false;
-      if (!validateMessage(content)) return false;
+      if (!validateMessage(content)) {
+        console.log('[DEBUG] Room message validation failed');
+        return false;
+      }
 
       // Extract mentions
       const mentions = extractMentions(content);
 
       // Generate a unique message ID
       const messageId = uuidv4();
+      
+      console.log('[DEBUG] Emitting room_message event:', {
+        id: messageId,
+        roomId: currentRoom.id,
+        content,
+        mentions
+      });
       
       // Don't add message locally, the server will broadcast it back to everyone
       // including the sender via the room_message_broadcast event
@@ -791,7 +1020,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
       return true;
     },
-    [socket, currentUser, currentRoom, validateMessage]
+    [socket, currentUser, currentRoom, validateMessage, extractMentions]
   );
 
   // Add a system message to room chat
@@ -812,117 +1041,171 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     setRoomMessages(prev => [...prev, systemMessage].slice(-MAX_MESSAGES));
   }, [currentRoom]);
 
+  // Listen for socket events
   useEffect(() => {
     if (!socket) return;
 
+    logDebug('Setting up socket event listeners, socket connected:', socket.connected);
+
+    // Listen for online count updates
+    socket.on('online_count', (data: { count: number }) => {
+      logDebug('Received online_count update:', data.count);
+      setOnlineUsers(data.count);
+    });
+
+    // Listen for user joined events
+    socket.on('user_joined', (data: { id: string; username: string; onlineCount: number }) => {
+      logDebug('User joined:', data);
+      setOnlineUsers(data.onlineCount);
+    });
+
+    // Listen for user left events
+    socket.on('user_left', (data: { id: string; username: string; onlineCount: number }) => {
+      logDebug('User left:', data);
+      setOnlineUsers(data.onlineCount);
+    });
+
+    // Listen for initial online users data
+    socket.on('online_users', (data: { users: User[]; count: number }) => {
+      logDebug('Received initial online users:', data);
+      setOnlineUsers(data.count);
+    });
+
+    // Send a test ping to verify connection
+    if (socket.connected) {
+      logDebug('Sending test ping to verify server connection');
+      socket.emit('ping');
+    }
+
     // Listen for global chat messages
-    socket.on('chat_message', ({ 
-      id,
-      senderId, 
-      senderUsername,
-      content,
-      timestamp,
-      userColor,
-      replyTo,
-      mentions,
-      isSystem,
-      type
-    }) => {
+    socket.on('chat_message', (data) => {
+      logDebug('Received chat_message event', data);
+      
       const newMessage: ChatMessage = {
-        id: id || `${senderId}-${timestamp}`,
-        username: senderUsername || 'SYSTEM',
-        content,
-        timestamp: new Date(timestamp),
-        userColor: userColor || '#39ff14',
+        id: data.id || `${data.senderId}-${data.timestamp}`,
+        username: data.senderUsername || 'SYSTEM',
+        content: data.content,
+        timestamp: new Date(data.timestamp),
+        userColor: data.userColor || '#39ff14',
         roomId: 'global',
-        replyTo,
-        mentions,
-        isSystem: isSystem || type === 'system',
-        type
+        replyTo: data.replyTo,
+        mentions: data.mentions,
+        isSystem: data.isSystem || data.type === 'system',
+        type: data.type
       };
       
-      console.log('Received message:', newMessage);
+      logDebug('Adding message to state:', newMessage);
       setMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
     });
 
     // Listen for room messages
-    socket.on('room_message_broadcast', ({ 
-      id,
-      roomId,
-      username,
-      content,
-      timestamp,
-      userColor,
-      replyTo,
-      mentions,
-      isSystem,
-      type
-    }) => {
-      if (currentRoom && roomId === currentRoom.id) {
-        // Create our message object
+    socket.on('room_message_broadcast', (data) => {
+      logDebug('Received room_message_broadcast', { 
+        id: data.id,
+        roomId: data.roomId,
+        currentRoomId: currentRoom?.id
+      });
+      
+      if (currentRoom && data.roomId === currentRoom.id) {
         const newMessage: ChatMessage = {
-          id: id || `room-${timestamp}`,
-          username: username || 'SYSTEM',
-          content,
-          timestamp: new Date(timestamp || Date.now()),
-          userColor: userColor || '#39ff14',
-          roomId,
-          replyTo,
-          mentions,
-          isSystem: isSystem || type === 'system',
-          type
+          id: data.id || `room-${data.timestamp}`,
+          username: data.username || 'SYSTEM',
+          content: data.content,
+          timestamp: new Date(data.timestamp || Date.now()),
+          userColor: data.userColor || '#39ff14',
+          roomId: data.roomId,
+          replyTo: data.replyTo,
+          mentions: data.mentions,
+          isSystem: data.isSystem || data.type === 'system',
+          type: data.type
         };
         
-        // Check if this message is already in our list to avoid duplicates
         const isDuplicate = roomMessages.some(msg => msg.id === newMessage.id);
         
         if (!isDuplicate) {
-          console.log('Received room message:', newMessage);
+          logDebug('Adding room message to state');
           setRoomMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
-          
-          // Check if message contains mentions
-          if (currentUser && newMessage.mentions?.includes(currentUser.username)) {
-            toast.info(`@${newMessage.username} mentioned you in the room`);
+        } else {
+          logDebug('Duplicate message, not adding');
           }
         } else {
-          console.log('Duplicate message detected, not adding:', newMessage.id);
+        logDebug('Ignoring message for different room', { 
+          msgRoomId: data.roomId, 
+          currentRoom: currentRoom?.id 
+        });
+      }
+    });
+
+    // Error handling
+    socket.on('error', (error) => {
+      console.error('Socket error:', error);
+      
+      // Handle "Not registered" error by attempting to re-register the user
+      if (error === 'Not registered' && currentUser) {
+        logDebug('Received "Not registered" error. Attempting to re-register user.');
+        
+        // Re-register with server with the persistent identity
+        if (currentUser.identity) {
+          registerUserWithServer(socket, currentUser);
+        } else {
+          // If we don't have an identity, create a new one
+          const identity = `identity_${Math.random().toString(36).substr(2, 9)}`;
+          const updatedUser = {
+            ...currentUser,
+            identity
+          };
+          
+          // Save the new identity
+          try {
+            saveIdentity(identity);
+            saveUser(updatedUser);
+            setCurrentUser(updatedUser);
+            registerUserWithServer(socket, updatedUser);
+          } catch (e) {
+            console.error('Failed to save identity during re-registration:', e);
+          }
         }
       }
     });
 
-    socket.on('mention', ({ username }) => {
-      toast.info(`@${username} mentioned you`);
-    });
-
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
-      toast.error(error);
-    });
+    // Status check every 5 seconds
+    const interval = setInterval(() => {
+      logDebug('Connection status check', {
+        socketConnected: socket.connected,
+        hasCurrentUser: !!currentUser,
+        messagesCount: messages.length,
+        roomMessagesCount: roomMessages.length
+      });
+    }, 5000);
 
     // Listen for leaderboard updates
     socket.on('leaderboard:data', (data: { users: UserMessageStats[] }) => {
-      console.log('Received leaderboard data:', data);
+      logDebug('Received leaderboard update:', data);
       setLeaderboard(data.users);
-    });
-
-    // Listen for global stats updates
-    socket.on('global_stats', (stats) => {
-      console.log('Received global stats:', stats);
-      setGlobalStats(stats);
     });
 
     // Request initial leaderboard data
     socket.emit('leaderboard:request');
 
     return () => {
+      clearInterval(interval);
       socket.off('chat_message');
       socket.off('room_message_broadcast');
-      socket.off('mention');
       socket.off('error');
       socket.off('leaderboard:data');
-      socket.off('global_stats');
     };
-  }, [socket, currentRoom, addNotification]);
+  }, [socket, currentRoom, currentUser]);
+
+  // Add periodic leaderboard refresh
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const refreshInterval = setInterval(() => {
+      socket.emit('leaderboard:request');
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [socket, isConnected]);
 
   // Add debounced typing handler
   const debouncedStopTyping = useCallback(
@@ -1096,54 +1379,128 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }
     });
 
+    // Add listener for hack access updates
+    socket.on('hack_access_update', (data: {
+      hasAccess: boolean;
+      accessInfo: {
+        type: string;
+        usageCount: number;
+        maxUsages: number | null;
+      } | null;
+    }) => {
+      setHasHackAccess(data.hasAccess);
+      setHackAccessInfo(data.accessInfo);
+      
+      // The server will send a notification, so we don't need to add a toast here
+    });
+
     return () => {
       socket.off('message_reaction_broadcast');
+      socket.off('hack_access_update');
     };
-  }, [socket]);
+  }, [socket, addNotification]);
 
-  // Remove the hack access check effect since everyone has access now
+  // Update the hack access check effect to use polling every 3 seconds
   useEffect(() => {
+    // Initial check when user is set
     if (currentUser) {
-      socket?.emit('check_hack_access', { userId: currentUser.id }, (response: { hasAccess: boolean }) => {
-        setHasHackAccess(true); // Always set to true regardless of server response
+      checkHackAccess();
+    } else {
+      setHasHackAccess(false);
+      setHackAccessInfo(null);
+    }
+    
+    // Set up polling interval
+    const hackAccessPollInterval = setInterval(() => {
+      if (currentUser && socket?.connected) {
+        logDebug('Polling hack access status');
+        checkHackAccess();
+      }
+    }, 3000); // Check every 3 seconds
+    
+    // Helper function to check hack access
+    function checkHackAccess() {
+      if (!socket || !currentUser) return;
+      
+      socket.emit('check_hack_access', { userId: currentUser.id }, (response: {
+        hasAccess: boolean;
+        accessInfo: {
+          type: string;
+          usageCount: number;
+          maxUsages: number | null;
+        } | null;
+      }) => {
+        logDebug('Hack access poll response:', response);
+        
+        // Only update state without showing notifications - server will send notification if needed
+        setHasHackAccess(response.hasAccess);
+        setHackAccessInfo(response.accessInfo);
       });
     }
-  }, [currentUser, socket]);
+    
+    // Clean up interval
+    return () => clearInterval(hackAccessPollInterval);
+  }, [currentUser, socket, hasHackAccess]);
 
-  const executeHack = useCallback(async () => {
-    if (!socket || !currentUser) {
+  const executeHack = useCallback(async (targetMode?: 'random' | 'specific', targetUsername?: string) => {
+    logDebug('executeHack called', { 
+      hasAccess: hasHackAccess, 
+      targetMode, 
+      targetUsername,
+      hackInfo: hackAccessInfo
+    });
+    
+    if (!socket || !currentUser || !hasHackAccess) {
+      logDebug('Cannot execute hack - missing prerequisites', {
+        socket: !!socket,
+        currentUser: !!currentUser,
+        hasHackAccess
+      });
       return { success: false, stolenPoints: 0, victims: [] };
     }
 
     return new Promise<{ success: boolean; stolenPoints: number; victims: string[] }>((resolve) => {
-      socket.emit('execute_hack', { userId: currentUser.id }, (response: { 
-        success: boolean;
-        stolenPoints: number;
-        victims: string[];
+      logDebug('Sending execute_hack event');
+      
+      // Set up a listener for the hack_completed event to resolve the promise
+      const handleHackCompleted = (response: { 
+        success: boolean; 
+        message?: string;
+        stolenPoints?: number;
+        victims?: string[];
       }) => {
-        if (response.success) {
-          // Add system message about the hack
-          const systemMessage: ChatMessage = {
-            id: `system-${Date.now()}`,
-            username: 'SYSTEM',
-            content: `🎯 ${currentUser.username} hacked ${response.victims.join(', ')} and stole ${response.stolenPoints} points!`,
-            timestamp: new Date(),
-            userColor: '#39ff14',
-            roomId: currentRoom?.id || 'global',
-            isSystem: true,
-            type: 'system'
-          };
-          
-          if (currentRoom) {
-            setRoomMessages(prev => [...prev, systemMessage].slice(-MAX_MESSAGES));
-          } else {
-            setMessages(prev => [...prev, systemMessage].slice(-MAX_MESSAGES));
-          }
-        }
-        resolve(response);
+        logDebug('Received hack_completed event in promise:', response);
+        
+        // The notification is handled by the general notification listener
+        
+        // Remove this one-time listener
+        socket.off('hack_completed', handleHackCompleted);
+        
+        // Resolve the promise with the result
+        resolve({
+          success: response.success,
+          stolenPoints: response.stolenPoints || 0,
+          victims: response.victims || []
+        });
+      };
+      
+      // Add the one-time listener
+      socket.on('hack_completed', handleHackCompleted);
+      
+      // Send the hack request
+      socket.emit('execute_hack', { 
+        userId: currentUser.id,
+        targetMode: targetMode || 'random',
+        targetUsername
       });
+      
+      // Set a timeout to clean up the listener if we don't get a response
+      setTimeout(() => {
+        socket.off('hack_completed', handleHackCompleted);
+        resolve({ success: false, stolenPoints: 0, victims: [] });
+      }, 10000); // 10 seconds timeout
     });
-  }, [socket, currentUser, currentRoom]);
+  }, [socket, currentUser, currentRoom, hasHackAccess, hackAccessInfo]);
 
   // Add listener for user points updates
   useEffect(() => {
@@ -1152,11 +1509,73 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     socket.on('user_points_update', (data: { points: number }) => {
       setCurrentUserPoints(data.points);
     });
+    
+    // Add listener for hack completion to stop the loading button
+    socket.on('hack_completed', (data: { 
+      success: boolean; 
+      message?: string;
+      stolenPoints?: number;
+      victims?: string[];
+    }) => {
+      logDebug('Received hack_completed event:', data);
+      // We don't need to show notifications here since they're handled elsewhere
+      // This event is just to stop loading indicators in the UI
+    });
+
+    // Add listener for notification events to standardize the UI
+    socket.on('notification', (data: { 
+      type: 'success' | 'error' | 'info' | 'warning';
+      title?: string;
+      message: string;
+      duration?: number;
+    }) => {
+      logDebug('Received notification event:', data);
+      
+      // Use the toast system for all notifications to ensure consistent styling
+      if (data.type === 'success') {
+        toast.success(data.message, {
+          duration: data.duration || 3000,
+          description: data.title // Use description instead of title for compatibility
+        });
+      } else if (data.type === 'error') {
+        toast.error(data.message, {
+          duration: data.duration || 4000,
+          description: data.title // Use description instead of title for compatibility
+        });
+      } else if (data.type === 'warning') {
+        toast.error(data.message, { // Use error with warning icon
+          duration: data.duration || 4000,
+          description: data.title // Use description instead of title for compatibility
+        });
+      } else {
+        toast.info(data.message, {
+          duration: data.duration || 3000,
+          description: data.title // Use description instead of title for compatibility
+        });
+      }
+    });
 
     return () => {
       socket.off('user_points_update');
+      socket.off('hack_completed');
+      socket.off('notification');
     };
   }, [socket]);
+
+  // Add this new effect to monitor message state
+  useEffect(() => {
+    logDebug('Messages state changed:', { 
+      count: messages.length, 
+      latest: messages.length > 0 ? messages[messages.length - 1] : 'none' 
+    });
+  }, [messages]);
+
+  useEffect(() => {
+    logDebug('RoomMessages state changed:', { 
+      count: roomMessages.length, 
+      latest: roomMessages.length > 0 ? roomMessages[roomMessages.length - 1] : 'none'
+    });
+  }, [roomMessages]);
 
   const value: ChatContextType = {
     messages,
@@ -1172,6 +1591,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     muteTimeRemaining,
     socket,
     currentUserPoints,
+    isReconnecting,      // Add to context value
+    reconnectAttempts,   // Add to context value
     
     // Room related functions and state
     currentRoom,
@@ -1186,6 +1607,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     globalStats,
     // Add hack-related properties
     hasHackAccess,
+    hackAccessInfo,
     executeHack
   };
 

@@ -1,10 +1,11 @@
 import React from 'react';
-import { useChat } from '@/context/ChatContext';
+import { ChatMessage } from '@/context/ChatContext';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import UsernameBadge from './UsernameBadge';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useChat } from '@/context/ChatContext';
 
 interface ThreadModalProps {
   message: ChatMessage;
@@ -13,6 +14,9 @@ interface ThreadModalProps {
 }
 
 const ThreadModal: React.FC<ThreadModalProps> = ({ message, replies, onClose }) => {
+  const { leaderboard } = useChat();
+  const championUsername = leaderboard[0]?.username;
+
   const renderThreadMessage = (msg: ChatMessage, depth: number = 0) => {
     const isSystem = msg.username.toLowerCase() === 'system';
     
@@ -30,6 +34,7 @@ const ThreadModal: React.FC<ThreadModalProps> = ({ message, replies, onClose }) 
             username={msg.username} 
             color={msg.userColor}
             isSystem={isSystem}
+            isChampion={msg.username === championUsername}
           />
           <span className="text-xs text-muted-foreground">
             {formatDistanceToNow(msg.timestamp, { addSuffix: true })}

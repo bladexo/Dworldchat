@@ -1,7 +1,8 @@
 import React from 'react';
 import { useChat } from '../context/ChatContext';
-import { Trophy, MessageSquare, Heart } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import UsernameBadge from './UsernameBadge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface LeaderboardProps {
   isOpen: boolean;
@@ -15,35 +16,23 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isOpen, onOpenChange }) => {
   const championUsername = leaderboard[0]?.username;
 
   return (
-    <div className={`fixed right-4 top-20 w-80 bg-black/90 border border-neon-green/20 rounded-lg shadow-lg transition-all duration-300 ${isOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'}`}>
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-neon-green flex items-center gap-2">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-black/90 border border-neon-green/20 text-neon-green sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-neon-green">
             <Trophy className="h-5 w-5 text-yellow-400" />
             Leaderboard
-          </h2>
-          <button 
-            onClick={() => onOpenChange(false)}
-            className="text-gray-400 hover:text-neon-green"
-          >
-            ×
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
         {/* Leaderboard Table */}
         <div className="overflow-hidden rounded-md border border-neon-green/20">
           <table className="w-full">
             <thead>
               <tr className="bg-black/50 border-b border-neon-green/20">
-                <th className="text-left py-2 px-3 text-neon-green text-xs font-mono">#</th>
-                <th className="text-left py-2 px-3 text-neon-green text-xs font-mono">User</th>
-                <th className="text-right py-2 px-3 text-neon-green text-xs font-mono">Points</th>
-                <th className="text-right py-2 px-3 text-neon-green text-xs font-mono">
-                  <MessageSquare className="h-3 w-3 inline ml-1" />
-                </th>
-                <th className="text-right py-2 px-3 text-neon-green text-xs font-mono">
-                  <Heart className="h-3 w-3 inline ml-1" />
-                </th>
+                <th className="text-left py-2 px-2 text-neon-green text-xs font-mono">#</th>
+                <th className="text-left py-2 px-2 text-neon-green text-xs font-mono">User</th>
+                <th className="text-right py-2 px-2 text-neon-green text-xs font-mono">Points</th>
               </tr>
             </thead>
             <tbody>
@@ -56,7 +45,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isOpen, onOpenChange }) => {
                     index === 2 ? 'bg-amber-700/10' : ''
                   }`}
                 >
-                  <td className="py-2 px-3 text-center">
+                  <td className="py-2 px-2 text-center">
                     {index === 0 ? (
                       <span className="text-yellow-400 font-bold">🥇</span>
                     ) : index === 1 ? (
@@ -67,30 +56,32 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ isOpen, onOpenChange }) => {
                       <span className="text-gray-500">{index + 1}</span>
                     )}
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-2">
                     <UsernameBadge 
                       username={user.username} 
                       color={user.color}
                       showIcon={false}
                       isChampion={user.username === championUsername}
+                      className="scale-90"
                     />
                   </td>
-                  <td className="py-2 px-3 text-right font-mono text-neon-green font-bold">
+                  <td className="py-2 px-2 text-right font-mono text-neon-green font-bold text-xs sm:text-sm">
                     {user.points}
-                  </td>
-                  <td className="py-2 px-3 text-right font-mono text-neon-green/70 text-xs">
-                    {user.messageCount}
-                  </td>
-                  <td className="py-2 px-3 text-right font-mono text-neon-green/70 text-xs">
-                    {user.reactionCount}
                   </td>
                 </tr>
               ))}
+              {leaderboard.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="py-4 text-center text-neon-green/50 text-sm">
+                    No data available
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

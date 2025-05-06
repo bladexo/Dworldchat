@@ -1,5 +1,7 @@
 import * as React from 'react';
 import { cn } from '../lib/utils';
+import { toast } from 'react-hot-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface UsernameBadgeProps {
   username?: string;
@@ -21,10 +23,20 @@ const UsernameBadge: React.FC<UsernameBadgeProps> = ({
   const displayName = username || 'Anonymous';
   const isSystemUser = isSystem || displayName.toLowerCase() === 'system';
 
-  return (
+  const handleClick = () => {
+    if (!isSystemUser) {
+      navigator.clipboard.writeText(displayName);
+      toast.success(`Copied ${displayName} to clipboard!`, {
+        duration: 2000
+      });
+    }
+  };
+
+  const badge = (
     <div
+      onClick={handleClick}
       className={cn(
-        'px-2 py-0.5 rounded text-sm font-mono relative overflow-visible',
+        'px-2 py-0.5 rounded text-sm font-mono relative overflow-visible cursor-pointer hover:opacity-80 transition-opacity',
         isSystemUser ? 'text-neon-green animate-pulse-subtle' : 'bg-opacity-20 border border-opacity-30',
         isChampion && !isSystemUser && 'champion-badge',
         className
@@ -56,6 +68,23 @@ const UsernameBadge: React.FC<UsernameBadgeProps> = ({
       )}
       {isSystemUser ? null : displayName}
     </div>
+  );
+
+  if (isSystemUser) {
+    return badge;
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {badge}
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Click to copy username</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
