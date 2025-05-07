@@ -9,11 +9,8 @@
       }
     }
   ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "github": {
     "enabled": true,
@@ -21,7 +18,7 @@
   },
   "env": {
     "VITE_DEBUG_MODE": "true",
-    "VITE_SERVER_URL": "https://charming-romola-dinno-3c220cbb.koyeb.app"
+    "VITE_SERVER_URL": "https://nutty-annabell-loganrustyy-25293412.koyeb.app"
   },
   "headers": [
     {
