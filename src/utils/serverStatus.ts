@@ -5,7 +5,7 @@
 
 // Get the appropriate server URL from env or default to localhost
 const SERVER_URL = import.meta.env.PROD 
-  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
+  ? 'https://nutty-annabell-loganrustyy-25293412.koyeb.app'
   : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Define status result type for reuse
