@@ -19,15 +19,9 @@
     "enabled": true,
     "silent": false
   },
-  "functions": {
-    "api/**/*.js": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  },
   "env": {
     "VITE_DEBUG_MODE": "true",
-    "VITE_SERVER_URL": "https://charming-romola-dinno-3c220cbb.koyeb.app"
+    "VITE_SERVER_URL": "https://nutty-annabell-loganrustyy-25293412.koyeb.app"
   },
   "headers": [
     {
