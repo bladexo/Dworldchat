@@ -87,9 +87,6 @@ const ChatInterface: React.FC = () => {
     executeHack,
     leaderboard,
     currentUserPoints,
-    socket,
-    isReconnecting,
-    reconnectAttempts,
   } = useChat();
   
   const [input, setInput] = useState('');
@@ -127,23 +124,6 @@ const ChatInterface: React.FC = () => {
   const [isHackModalOpen, setIsHackModalOpen] = useState(false);
   const [hackTarget, setHackTarget] = useState<string>('');
   const [hackMode, setHackMode] = useState<'random' | 'specific'>('random');
-
-  // Add state to track when hack access changes
-  const [hackAccessJustChanged, setHackAccessJustChanged] = useState(false);
-  
-  // Listen for hack access changes and show notification
-  useEffect(() => {
-    if (hasHackAccess) {
-      setHackAccessJustChanged(true);
-      
-      // Reset the notification effect after 5 seconds
-      const timer = setTimeout(() => {
-        setHackAccessJustChanged(false);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [hasHackAccess, hackAccessInfo]);
 
   useEffect(() => {
     if (currentUser && inputRef.current) {
@@ -458,8 +438,6 @@ const ChatInterface: React.FC = () => {
   const handleHackClick = () => {
     if (hasHackAccess) {
       setIsHackModalOpen(true);
-      // Clear the notification state when user clicks the button
-      setHackAccessJustChanged(false);
     } else {
       toast.error('You do not have hack access. Ask an admin for access.');
     }
@@ -474,40 +452,26 @@ const ChatInterface: React.FC = () => {
     
     try {
       // Pass the targeting mode and username to the executeHack function
-      executeHack(
+      const result = await executeHack(
         hackMode, 
         hackMode === 'specific' ? hackTarget : undefined
-      ).catch(error => {
-        console.error('Hack error:', error);
-        toast.error('Failed to execute hack');
-        setIsHacking(false);
-      });
+      );
       
-      // The loading state will be cleared by the hack_completed event
-      // We don't need to manually handle success/error notifications here
-      // as they're handled by the server-side notification system
-      
+      if (result.success) {
+        toast.success(`Hack successful! Stole ${result.stolenPoints} points from ${result.victims.length} user(s)`);
+      } else {
+        toast.error('Hack failed. Try again later.');
+      }
+    } catch (error) {
+      console.error('Hack error:', error);
+      toast.error('Failed to execute hack');
     } finally {
+      setIsHacking(false);
       // Reset hack options
       setHackTarget('');
       setHackMode('random');
     }
   };
-
-  // Listen for hack completion to stop loading state
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleHackCompleted = () => {
-      setIsHacking(false);
-    };
-
-    socket.on('hack_completed', handleHackCompleted);
-
-    return () => {
-      socket.off('hack_completed', handleHackCompleted);
-    };
-  }, [socket]);
 
   return (
     <>
@@ -650,10 +614,8 @@ const ChatInterface: React.FC = () => {
               </div>
             ) : (
               <div className="flex items-center gap-1 text-red-500">
-                <WifiOff className={`h-4 w-4 sm:h-5 sm:w-5 ${isReconnecting ? 'animate-pulse' : ''}`} />
-                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">
-                  {isReconnecting ? `RECONNECTING${'.'.repeat(reconnectAttempts % 4)}` : 'DISCONNECTED'}
-                </span>
+                <WifiOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="text-[10px] sm:text-xs font-mono hidden sm:inline">DISCONNECTED</span>
               </div>
             )}
             <Button
@@ -678,12 +640,12 @@ const ChatInterface: React.FC = () => {
             </Button>
             {currentUser && (
               <>
-                <UsernameBadge 
-                  username={currentUser.username} 
-                  color={currentUser.color}
-                  showIcon 
-                  className="scale-75 sm:scale-90 md:scale-100"
-                />
+              <UsernameBadge 
+                username={currentUser.username} 
+                color={currentUser.color}
+                showIcon 
+                className="scale-75 sm:scale-90 md:scale-100"
+              />
                 <span className="text-[10px] sm:text-xs font-mono text-neon-green ml-1">
                   {currentUserPoints} pts
                 </span>
@@ -852,12 +814,7 @@ const ChatInterface: React.FC = () => {
                 )}
                 <Button
                   onClick={handleHackClick}
-                  className={`
-                    ${themeColor.bg} border ${themeColor.border} 
-                    text-red-500 hover:text-red-400 hover:bg-red-500/20 transition-colors
-                    ${!hasHackAccess ? 'opacity-60' : ''}
-                    ${hackAccessJustChanged ? 'animate-pulse ring-2 ring-red-500 ring-opacity-70' : ''}
-                  `}
+                  className={`${themeColor.bg} border ${themeColor.border} text-red-500 hover:text-red-400 hover:bg-red-500/20 transition-colors ${!hasHackAccess ? 'opacity-60' : ''}`}
                   title={hasHackAccess 
                     ? hackAccessInfo?.type === 'free'
                       ? 'Unlimited hacks available'
@@ -870,10 +827,7 @@ const ChatInterface: React.FC = () => {
                   {isHacking ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <span className={`
-                      ${currentRoom?.theme === 'premium' ? '' : 'font-mono'} text-sm
-                      ${hackAccessJustChanged ? 'text-red-400 font-bold' : ''}
-                    `}>HACK</span>
+                    <span className="font-mono text-sm">HACK</span>
                   )}
                 </Button>
                 <Button 
@@ -905,7 +859,7 @@ const ChatInterface: React.FC = () => {
       <Dialog open={isHackModalOpen} onOpenChange={setIsHackModalOpen}>
         <DialogContent className={`${themeColor.bg} border ${themeColor.border} ${themeColor.text}`}>
           <DialogHeader>
-            <DialogTitle className="text-center text-lg font-mono">EXECUTE HACK</DialogTitle>
+            <DialogTitle className="text-center text-lg">EXECUTE HACK</DialogTitle>
           </DialogHeader>
           
           <div className="py-4">
@@ -916,14 +870,14 @@ const ChatInterface: React.FC = () => {
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="random" id="random" />
-                <Label htmlFor="random" className="flex items-center gap-2 font-mono">
+                <Label htmlFor="random" className="flex items-center gap-2">
                   <Shuffle className="h-4 w-4" /> Random
                 </Label>
               </div>
               
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="specific" id="specific" />
-                <Label htmlFor="specific" className="flex items-center gap-2 font-mono">
+                <Label htmlFor="specific" className="flex items-center gap-2">
                   <Target className="h-4 w-4" /> Specific
                 </Label>
               </div>
@@ -931,18 +885,18 @@ const ChatInterface: React.FC = () => {
             
             {hackMode === 'specific' && (
               <div className="mt-4">
-                <Label htmlFor="target-username" className="mb-2 block font-mono">Target Username</Label>
+                <Label htmlFor="target-username" className="mb-2 block">Target Username</Label>
                 <Input 
                   id="target-username"
                   value={hackTarget}
                   onChange={(e) => setHackTarget(e.target.value)}
                   placeholder="Enter username to hack"
-                  className={`bg-transparent border ${themeColor.border} ${themeColor.text} font-mono`}
+                  className={`bg-transparent border ${themeColor.border} ${themeColor.text}`}
                 />
               </div>
             )}
             
-            <div className="mt-4 text-center font-mono">
+            <div className="mt-4 text-center">
               {hackAccessInfo?.type === 'free' ? (
                 <p>You have unlimited hack access</p>
               ) : hackAccessInfo?.maxUsages ? (
@@ -952,8 +906,8 @@ const ChatInterface: React.FC = () => {
           </div>
           
           <DialogFooter className="flex gap-2">
-            <Button onClick={() => setIsHackModalOpen(false)} variant="outline" className="font-mono">Cancel</Button>
-            <Button onClick={handleHackExecute} className="bg-red-600 hover:bg-red-700 font-mono">Execute Hack</Button>
+            <Button onClick={() => setIsHackModalOpen(false)} variant="outline">Cancel</Button>
+            <Button onClick={handleHackExecute} className="bg-red-600 hover:bg-red-700">Execute Hack</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

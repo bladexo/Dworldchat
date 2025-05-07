@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { Notification } from '@/components/NotificationFeed';
 import { debounce } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
-import { checkServerStatus, createStatusMonitor, ServerStatusResult } from '../utils/serverStatus';
 
 // DEBUG CONFIG - SET TO TRUE TO ENABLE VERBOSE LOGGING
 const DEBUG_MODE = true;
@@ -101,8 +100,6 @@ interface ChatContextType {
   muteTimeRemaining: number;
   socket: Socket | null;
   currentUserPoints: number;
-  isReconnecting: boolean;  // Add reconnection status
-  reconnectAttempts: number; // Add reconnection attempts
   
   // Room related functions and state
   currentRoom: Room | null;
@@ -128,15 +125,12 @@ interface ChatContextType {
     maxUsages: number | null;
   } | null;
   executeHack: (targetMode?: 'random' | 'specific', targetUsername?: string) => Promise<{ success: boolean; stolenPoints: number; victims: string[] }>;
-  checkConnectionAndReconnect: () => void;
-  serverStatus: ServerStatusResult;
-  checkServerStatus: () => Promise<ServerStatusResult>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const SOCKET_URL = import.meta.env.PROD 
-  ? 'https://nutty-annabell-loganrustyy-25293412.koyeb.app'
+  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
   : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Log socket configuration 
@@ -215,10 +209,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const disconnectCount = useRef(0);
   const lastDisconnectTime = useRef(Date.now());
 
-  // Add server status monitoring
-  const [serverStatus, setServerStatus] = useState<ServerStatusResult>({ online: false });
-  const statusMonitorRef = useRef<ReturnType<typeof createStatusMonitor> | null>(null);
-
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     if (!currentUser) return;
     
@@ -288,47 +278,22 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       return;
     }
     
-    // Add explicit registration confirmation callback
     socket.emit('register_user', { 
       identity: user.identity,
       username: user.username,
       color: user.color,
       publicKey: 'dummy-key-' + Math.random().toString(36).substr(2, 9)
-    }, (response: { success: boolean; error?: string }) => {
-      if (response) {
-        logDebug('Received register_user callback response:', response);
-        if (response.success) {
-          logDebug('User registration succeeded via callback');
-        } else {
-          logDebug('User registration failed via callback:', response.error);
-          // Try using the old registration method as fallback
-          socket.emit('register', { 
-            username: user.username, 
-            color: user.color 
-          });
-        }
-      }
     });
     
     // Verify registration after a delay
     setTimeout(() => {
       if (socket.connected) {
-        logDebug('Checking registration status after delay');
-        socket.emit('check_registration', { username: user.username }, (response: { registered: boolean }) => {
-          logDebug('Registration check result:', response);
-          if (!response || !response.registered) {
-            logDebug('Registration check failed, trying fallback register method');
-            // Try using the old registration method as fallback
-            socket.emit('register', { 
-              username: user.username, 
-              color: user.color 
-            });
-          }
-        });
+        logDebug('Checking registration status');
+        socket.emit('ping');
       } else {
         logDebug('Socket disconnected after registration attempt');
       }
-    }, 2000);
+    }, 1000);
   }, []);
 
   // Helper function to clear stored session data
@@ -358,32 +323,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     };
   }, []);
 
-  // Initialize server status monitoring
-  useEffect(() => {
-    // Create monitor that updates state when server status changes
-    statusMonitorRef.current = createStatusMonitor(30000, (status) => {
-      setServerStatus(status);
-      logDebug('Server status check:', status);
-      
-      // If server is online but socket is disconnected, try reconnecting
-      if (status.online && socket && !socket.connected && !isReconnecting) {
-        logDebug('Server is online but socket is disconnected, attempting reconnection');
-        checkConnectionAndReconnect();
-      }
-    });
-    
-    // Start monitoring
-    statusMonitorRef.current.start();
-    
-    // Cleanup on unmount
-    return () => {
-      if (statusMonitorRef.current) {
-        statusMonitorRef.current.stop();
-      }
-    };
-  }, [socket, isReconnecting]);
-
-  // Update the socket initialization to include connection timeout handling
   useEffect(() => {
     logDebug('Initializing socket connection to:', SOCKET_URL);
     
@@ -394,39 +333,15 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       reconnectionDelayMax: 5000,
       reconnectionAttempts: Infinity,
       timeout: 20000,
-      autoConnect: true,
-      forceNew: false,
-      reconnection: true
+      autoConnect: false,
+      forceNew: false
     });
 
     // Set up ping interval
     let pingInterval: NodeJS.Timeout;
-    let connectionTimeout: NodeJS.Timeout;
-    
-    // Add connection timeout handler
-    connectionTimeout = setTimeout(() => {
-      if (newSocket && !newSocket.connected) {
-        logDebug('Connection timeout - server not responding');
-        toast.error('Server connection timeout. Trying again...');
-        
-        // Check server status
-        checkServerStatus().then(status => {
-          setServerStatus(status);
-          if (!status.online) {
-            toast.error('Chat server appears to be offline. Please try again later.');
-          } else {
-            // Server is up but socket couldn't connect
-            newSocket.connect();
-          }
-        });
-      }
-    }, 10000);
     
     // Add connection handler
     newSocket.on('connect', () => {
-      // Clear timeout on successful connection
-      clearTimeout(connectionTimeout);
-      
       logDebug('Socket CONNECTED', { 
         id: newSocket.id, 
         transport: newSocket.io?.engine?.transport?.name || 'unknown'
@@ -448,46 +363,14 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         logDebug('Re-registering user after reconnection', currentUser.username);
         registerUserWithServer(newSocket, currentUser);
       }
-    });
-
+        });
+        
     // Handle pong responses
     newSocket.on('pong', () => {
       logDebug('Received pong from server');
     });
 
-    // Add reconnect attempt handler to track reconnection progress
-    newSocket.io.on('reconnect_attempt', (attempt) => {
-      logDebug(`Socket reconnect attempt #${attempt}`);
-        setIsReconnecting(true);
-      setReconnectAttempts(attempt);
-      
-      // Show notification on first and fifth attempts
-      if (attempt === 1) {
-        toast.error('Connection lost. Attempting to reconnect...', {
-          duration: 4000
-        });
-      } else if (attempt === 5) {
-        toast.error('Still trying to reconnect...', {
-          duration: 4000
-        });
-      }
-    });
-
-    // Add reconnect success handler
-    newSocket.io.on('reconnect', () => {
-      logDebug('Socket reconnected successfully');
-      setIsReconnecting(false);
-      
-      // Re-register user if we have one
-      if (currentUser) {
-        logDebug('Re-registering user after reconnection success', currentUser.username);
-        registerUserWithServer(newSocket, currentUser);
-      }
-      
-      toast.success('Connection restored!', { duration: 3000 });
-    });
-
-    // Add disconnect handler
+    // Add disconnect handler with immediate reconnection
     newSocket.on('disconnect', (reason) => {
       logDebug('Socket DISCONNECTED', { reason, socketId: newSocket.id });
       setIsConnected(false);
@@ -500,41 +383,42 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       // If server initiated disconnect or transport close, try to reconnect immediately
       if (reason === 'io server disconnect' || reason === 'transport close') {
         logDebug('Server initiated disconnect, attempting immediate reconnection');
-        newSocket.connect();
-      }
-    });
+              newSocket.connect();
+            }
 
-    // Add connect_error handler
-    newSocket.on('connect_error', (error) => {
-      logDebug('Socket connect error:', error.message);
-      
-      // Check server status immediately on connection error
-      checkServerStatus().then(status => {
-        setServerStatus(status);
-        if (!status.online) {
-          toast.error('Unable to connect to chat server. Server may be down.');
-        }
-      });
+      // Show toast for disconnect
+      toast.error('Disconnected from server. Attempting to reconnect...');
     });
 
     // Start the connection
-    if (!newSocket.connected) {
-      newSocket.connect();
-    }
+    newSocket.connect();
     setSocket(newSocket);
 
     return () => {
       logDebug('Socket cleanup on component unmount');
       if (pingInterval) {
-        clearInterval(pingInterval);
-      }
-      if (connectionTimeout) {
-        clearTimeout(connectionTimeout);
+      clearInterval(pingInterval);
       }
       newSocket.removeAllListeners();
       newSocket.close();
     };
   }, []); // Empty dependency array to prevent recreation
+
+  // Add recovery mechanism for when connection is lost
+  useEffect(() => {
+    if (socket && !isConnected && currentUser && !isReconnecting) {
+      const reconnectInterval = setInterval(() => {
+        if (!socket.connected) {
+          logDebug('Connection lost, attempting to reconnect...');
+          socket.connect();
+        } else {
+          clearInterval(reconnectInterval);
+        }
+      }, 3000);
+
+      return () => clearInterval(reconnectInterval);
+    }
+  }, [socket, isConnected, currentUser, isReconnecting]);
 
   // Validate message
   const validateMessage = (content: string): boolean => {
@@ -591,46 +475,24 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     
     logDebug('Creating new user:', { username, color, identity, socketId: socket.id });
     
-    // Save identity in session storage
-    saveIdentity(identity);
-    
-    // Create user object
     const user: User = {
       id: socket.id,
       username,
       color,
       identity
     };
-    
-    // Save user in session storage
+
+    // Save user information to sessionStorage
+    saveIdentity(identity);
     saveUser(user);
-    
-    // Set user in state
-    setCurrentUser(user);
-    
-    // Register with server (will handle welcome notification)
+
+    // Register with server with the persistent identity
     registerUserWithServer(socket, user);
     
-    // Add a delayed verification check
-    setTimeout(() => {
-      if (socket && socket.connected && currentUser) {
-        logDebug('Delayed verification of user registration');
-        socket.emit('check_registration', { username: currentUser.username }, (response: { registered: boolean }) => {
-          logDebug('Delayed registration check result:', response);
-          if (!response || !response.registered) {
-            logDebug('Delayed registration check failed, trying fallback register method');
-            // Try using the old registration method as fallback
-            socket.emit('register', { 
-              username: currentUser.username, 
-              color: currentUser.color 
-            });
-          }
-        });
-      }
-    }, 3000);
-    
-    // Removed local toast since the server will send a welcome notification
-  }, [socket, isConnected, registerUserWithServer, getStoredIdentity, saveIdentity]);
+    setCurrentUser(user);
+    logDebug('Current user state updated');
+    toast.success(`Welcome, ${username}!`);
+  }, [socket, isConnected, registerUserWithServer]);
 
   // Update mute check interval to use refs and avoid render updates
   useEffect(() => {
@@ -726,7 +588,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     
     if (!socket || !currentUser) {
       logDebug('Cannot send message: no socket or user');
-      toast.error('Connection issue. Please try again.');
       return false;
     }
     
@@ -748,61 +609,26 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
     setLastMessageTime(now);
 
-    // Check registration status before sending
-    socket.emit('check_registration', { username: currentUser.username }, (response: { registered: boolean }) => {
-      logDebug('Check registration before sending message:', response);
-      
-      if (!response || !response.registered) {
-        logDebug('User not registered, attempting to re-register before sending message');
-        
-        // Try both registration methods to ensure it works
-        registerUserWithServer(socket, currentUser);
-        
-        // Wait longer for registration to complete
-        setTimeout(() => {
-          logDebug('Retrying message send after registration');
-          socket.emit('chat_message', {
-            content,
-            senderId: currentUser.id,
-            senderUsername: currentUser.username,
-            userColor: currentUser.color,
-            replyTo: replyTo ? {
-              id: replyTo.id,
-              username: replyTo.username,
-              content: replyTo.content
-            } : undefined
-          }, (ack: { received: boolean }) => {
-            logDebug('Message send acknowledgment:', ack);
-          });
-        }, 2000);
-        
-        return;
-      }
-      
-      // User is registered, send the message
-      logDebug('Emitting chat_message event', {
-        content,
-        senderId: currentUser.id,
-        senderUsername: currentUser.username
-      });
+    logDebug('Emitting chat_message event', {
+      content,
+      senderId: currentUser.id,
+      senderUsername: currentUser.username
+    });
 
-      socket.emit('chat_message', {
-        content,
-        senderId: currentUser.id,
-        senderUsername: currentUser.username,
-        userColor: currentUser.color,
-        replyTo: replyTo ? {
-          id: replyTo.id,
-          username: replyTo.username,
-          content: replyTo.content
-        } : undefined
-      }, (ack: { received: boolean }) => {
-        logDebug('Message send acknowledgment:', ack);
-      });
+    socket.emit('chat_message', {
+      content,
+      senderId: currentUser.id,
+      senderUsername: currentUser.username,
+      userColor: currentUser.color,
+      replyTo: replyTo ? {
+        id: replyTo.id,
+        username: replyTo.username,
+        content: replyTo.content
+      } : undefined
     });
     
     return true;
-  }, [socket, currentUser, lastMessageTime, muteInfo, validateMessage, registerUserWithServer]);
+  }, [socket, currentUser, lastMessageTime, muteInfo, validateMessage]);
 
   // Room Functions
   const createRoom = useCallback(async (name: string, theme: RoomTheme): Promise<Room> => {
@@ -1264,57 +1090,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // Error handling
     socket.on('error', (error) => {
       console.error('Socket error:', error);
-      
-      // Handle "Not registered" error by attempting to re-register the user
-      if (error === 'Not registered' && currentUser) {
-        logDebug('Received "Not registered" error. Attempting to re-register user.');
-        
-        // Check if we're actually registered first
-        socket.emit('check_registration', { username: currentUser.username }, (response: { registered: boolean }) => {
-          if (response && response.registered) {
-            logDebug('User is actually registered, ignoring error');
-            return;
-          }
-          
-          logDebug('User is not registered, attempting to re-register');
-          
-          // Re-register with server with the persistent identity
-          if (currentUser.identity) {
-            // Ensure we're connected before attempting to register
-            if (socket.connected) {
-              registerUserWithServer(socket, currentUser);
-        } else {
-              logDebug('Socket not connected, waiting for reconnection before re-registering');
-              // Will be handled by the connect event handler
-            }
-          } else {
-            // If we don't have an identity, create a new one
-            const identity = `identity_${Math.random().toString(36).substr(2, 9)}`;
-            const updatedUser = {
-              ...currentUser,
-              identity
-            };
-            
-            // Save the new identity
-            try {
-              saveIdentity(identity);
-              saveUser(updatedUser);
-              setCurrentUser(updatedUser);
-              
-              if (socket.connected) {
-                registerUserWithServer(socket, updatedUser);
-              }
-            } catch (e) {
-              console.error('Failed to save identity during re-registration:', e);
-            }
-          }
-        });
-      }
-    });
-
-    // Add handler for registration confirmation
-    socket.on('registration_confirmed', () => {
-      logDebug('Registration confirmed by server');
     });
 
     // Status check every 5 seconds
@@ -1540,7 +1315,13 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       setHasHackAccess(data.hasAccess);
       setHackAccessInfo(data.accessInfo);
       
-      // The server will send a notification, so we don't need to add a toast here
+      // Show notification about hack access
+      if (data.hasAccess) {
+        toast.success(data.accessInfo?.type === 'free' 
+          ? '🎯 You have been granted unlimited hack access!'
+          : `🎯 You have been granted hack access! (${data.accessInfo?.maxUsages} uses)`
+        );
+      }
     });
 
     return () => {
@@ -1569,9 +1350,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     
     // Helper function to check hack access
     function checkHackAccess() {
-      if (!socket || !currentUser) return;
-      
-      socket.emit('check_hack_access', { userId: currentUser.id }, (response: {
+      socket?.emit('check_hack_access', { userId: currentUser.id }, (response: { 
         hasAccess: boolean;
         accessInfo: {
           type: string;
@@ -1581,7 +1360,14 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }) => {
         logDebug('Hack access poll response:', response);
         
-        // Only update state without showing notifications - server will send notification if needed
+        // Only show notification if hack access changes from false to true
+        if (response.hasAccess && !hasHackAccess) {
+          toast.success(response.accessInfo?.type === 'free' 
+            ? '🎯 You have been granted unlimited hack access!'
+            : `🎯 You have been granted hack access! (${response.accessInfo?.maxUsages} uses)`
+          );
+        }
+        
         setHasHackAccess(response.hasAccess);
         setHackAccessInfo(response.accessInfo);
       });
@@ -1611,43 +1397,47 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     return new Promise<{ success: boolean; stolenPoints: number; victims: string[] }>((resolve) => {
       logDebug('Sending execute_hack event');
       
-      // Set up a listener for the hack_completed event to resolve the promise
-      const handleHackCompleted = (response: { 
-        success: boolean;
-        message?: string;
-        stolenPoints?: number;
-        victims?: string[];
-      }) => {
-        logDebug('Received hack_completed event in promise:', response);
-        
-        // The notification is handled by the general notification listener
-        
-        // Remove this one-time listener
-        socket.off('hack_completed', handleHackCompleted);
-        
-        // Resolve the promise with the result
-        resolve({
-          success: response.success,
-          stolenPoints: response.stolenPoints || 0,
-          victims: response.victims || []
-        });
-      };
-      
-      // Add the one-time listener
-      socket.on('hack_completed', handleHackCompleted);
-      
-      // Send the hack request
       socket.emit('execute_hack', { 
         userId: currentUser.id,
         targetMode: targetMode || 'random',
         targetUsername
+      }, (response: { 
+        success: boolean;
+        stolenPoints: number;
+        victims: string[];
+      }) => {
+        logDebug('Received hack response', response);
+        
+        if (response.success) {
+          // Add system message about the hack
+          const systemMessage: ChatMessage = {
+            id: `system-${Date.now()}`,
+            username: 'SYSTEM',
+            content: `🎯 ${currentUser.username} hacked ${response.victims.join(', ')} and stole ${response.stolenPoints} points!`,
+            timestamp: new Date(),
+            userColor: '#39ff14',
+            roomId: currentRoom?.id || 'global',
+            isSystem: true,
+            type: 'system'
+          };
+          
+          if (currentRoom) {
+            setRoomMessages(prev => [...prev, systemMessage].slice(-MAX_MESSAGES));
+          } else {
+            setMessages(prev => [...prev, systemMessage].slice(-MAX_MESSAGES));
+          }
+          
+          // Show success notification
+          toast.success(`Hack successful! Stole ${response.stolenPoints} points from ${response.victims.length} user(s)`);
+          
+          // Our polling will automatically update hack access status
+        } else {
+          // Show error notification
+          toast.error('Hack failed. Try again later.');
+        }
+        
+        resolve(response);
       });
-      
-      // Set a timeout to clean up the listener if we don't get a response
-      setTimeout(() => {
-        socket.off('hack_completed', handleHackCompleted);
-        resolve({ success: false, stolenPoints: 0, victims: [] });
-      }, 10000); // 10 seconds timeout
     });
   }, [socket, currentUser, currentRoom, hasHackAccess, hackAccessInfo]);
 
@@ -1658,56 +1448,9 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     socket.on('user_points_update', (data: { points: number }) => {
       setCurrentUserPoints(data.points);
     });
-    
-    // Add listener for hack completion to stop the loading button
-    socket.on('hack_completed', (data: { 
-      success: boolean; 
-      message?: string;
-      stolenPoints?: number;
-      victims?: string[];
-    }) => {
-      logDebug('Received hack_completed event:', data);
-      // We don't need to show notifications here since they're handled elsewhere
-      // This event is just to stop loading indicators in the UI
-    });
-
-    // Add listener for notification events to standardize the UI
-    socket.on('notification', (data: { 
-      type: 'success' | 'error' | 'info' | 'warning';
-      title?: string;
-      message: string;
-      duration?: number;
-    }) => {
-      logDebug('Received notification event:', data);
-      
-      // Use the toast system for all notifications to ensure consistent styling
-      if (data.type === 'success') {
-        toast.success(data.message, {
-          duration: data.duration || 3000,
-          description: data.title // Use description instead of title for compatibility
-        });
-      } else if (data.type === 'error') {
-        toast.error(data.message, {
-          duration: data.duration || 4000,
-          description: data.title // Use description instead of title for compatibility
-        });
-      } else if (data.type === 'warning') {
-        toast.error(data.message, { // Use error with warning icon
-          duration: data.duration || 4000,
-          description: data.title // Use description instead of title for compatibility
-        });
-      } else {
-        toast.info(data.message, {
-          duration: data.duration || 3000,
-          description: data.title // Use description instead of title for compatibility
-        });
-      }
-    });
 
     return () => {
       socket.off('user_points_update');
-      socket.off('hack_completed');
-      socket.off('notification');
     };
   }, [socket]);
 
@@ -1726,40 +1469,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }, [roomMessages]);
 
-  // Add a function to check connection status and reconnect if needed
-  const checkConnectionAndReconnect = useCallback(() => {
-    logDebug('Checking connection status', { 
-      socketExists: !!socket, 
-      isConnected: socket?.connected || false 
-    });
-    
-    if (socket && !socket.connected) {
-      logDebug('Socket exists but not connected, attempting to reconnect');
-      socket.connect();
-      
-      // Verify connection after a delay
-      setTimeout(() => {
-        if (socket.connected) {
-          logDebug('Reconnection successful');
-          setIsConnected(true);
-          
-          // Re-register if we have a user
-          if (currentUser) {
-            registerUserWithServer(socket, currentUser);
-          }
-        } else {
-          logDebug('Reconnection failed');
-          toast.error('Unable to connect to chat server. Please refresh the page.');
-        }
-      }, 2000);
-    } else if (!socket) {
-      logDebug('No socket instance exists');
-      toast.error('Chat connection not initialized. Please refresh the page.');
-    } else {
-      logDebug('Socket is already connected');
-    }
-  }, [socket, currentUser, registerUserWithServer]);
-
   const value: ChatContextType = {
     messages,
     currentUser,
@@ -1774,8 +1483,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     muteTimeRemaining,
     socket,
     currentUserPoints,
-    isReconnecting,      // Add to context value
-    reconnectAttempts,   // Add to context value
     
     // Room related functions and state
     currentRoom,
@@ -1791,12 +1498,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // Add hack-related properties
     hasHackAccess,
     hackAccessInfo,
-    executeHack,
-    checkConnectionAndReconnect,
-    serverStatus,
-    checkServerStatus: () => statusMonitorRef.current
-      ? statusMonitorRef.current.checkNow()
-      : Promise.resolve({ online: false }),
+    executeHack
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
