@@ -21,7 +21,7 @@
   },
   "env": {
     "VITE_DEBUG_MODE": "true",
-    "VITE_SERVER_URL": "https://nutty-annabell-loganrustyy-25293412.koyeb.app"
+    "VITE_SERVER_URL": "https://charming-romola-dinno-3c220cbb.koyeb.app"
   },
   "headers": [
     {
@@ -36,6 +36,5 @@
   ],
   "trailingSlash": false,
   "cleanUrls": true,
-  "regions": ["all"],
   "public": false
 } 
