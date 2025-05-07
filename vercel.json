@@ -43,9 +43,5 @@
   "trailingSlash": false,
   "cleanUrls": true,
   "regions": ["all"],
-  "public": false,
-  "logger": {
-    "format": "combined",
-    "level": "debug"
-  }
+  "public": false
 } 
