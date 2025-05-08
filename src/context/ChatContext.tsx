@@ -16,7 +16,7 @@ const logDebug = (...args: any[]) => {
 
 // Constants
 const MAX_MESSAGES = 100; // Maximum number of messages to keep in history
-const RECONNECT_MAX_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+const RECONNECT_MAX_TIME = Infinity; // 5 minutes in milliseconds
 const RECONNECT_INTERVAL = 3000; // 3 seconds
 
 // Room themes
@@ -382,7 +382,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       withCredentials: true,
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000
