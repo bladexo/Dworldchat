@@ -124,13 +124,18 @@ interface ChatContextType {
     usageCount: number;
     maxUsages: number | null;
   } | null;
-  executeHack: (targetMode?: 'random' | 'specific', targetUsername?: string) => Promise<{ success: boolean; stolenPoints: number; victims: string[] }>;
+  executeHack: (targetMode?: 'random' | 'specific', targetUsername?: string) => Promise<{ 
+    success: boolean; 
+    stolenPoints: number; 
+    victims: string[];
+    message?: string;
+  }>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const SOCKET_URL = import.meta.env.PROD 
-  ? 'https://nutty-annabell-loganrustyy-25293412.koyeb.app'
+  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
   : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Log socket configuration 
@@ -209,6 +214,9 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const disconnectCount = useRef(0);
   const lastDisconnectTime = useRef(Date.now());
 
+  // Add a flag to track intentional disconnections
+  const [isIntentionalDisconnect, setIsIntentionalDisconnect] = useState(false);
+
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     if (!currentUser) return;
     
@@ -278,11 +286,37 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       return;
     }
     
+    // Add specific error handler for registration
+    const registrationErrorHandler = (error: string) => {
+      logDebug('Registration error:', error);
+      
+      if (error === 'Not registered' || error.includes('register')) {
+        // If we get a registration error, try registering again after a short delay
+        setTimeout(() => {
+          if (socket.connected) {
+            logDebug('Retrying registration after error');
+            socket.emit('register_user', { 
+              identity: user.identity,
+              username: user.username,
+              color: user.color
+            });
+          }
+        }, 1000);
+      }
+    };
+    
+    // Listen for error events specifically for registration issues
+    socket.once('error', registrationErrorHandler);
+    
+    // Remove the error handler after 5 seconds
+          setTimeout(() => {
+      socket.off('error', registrationErrorHandler);
+    }, 5000);
+    
     socket.emit('register_user', { 
       identity: user.identity,
       username: user.username,
-      color: user.color,
-      publicKey: 'dummy-key-' + Math.random().toString(36).substr(2, 9)
+      color: user.color
     });
     
     // Verify registration after a delay
@@ -297,128 +331,127 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   // Helper function to clear stored session data
-  const clearSessionData = useCallback(() => {
-    try {
-      sessionStorage.removeItem('chat_identity');
-      sessionStorage.removeItem('chat_user');
-      console.log('Session data cleared');
-    } catch (error) {
-      console.error('Error clearing sessionStorage:', error);
-    }
-  }, []);
+  const clearSessionData = () => {
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('identity');
+    sessionStorage.removeItem('pageLoadTimestamp');
+  };
 
-  // Add event listener for page unload to differentiate between refresh and reconnect
+  // Update the beforeunload handler
   useEffect(() => {
-    // Setup event listener to clear session on page unload
     const handleBeforeUnload = () => {
-      console.log('Page is being unloaded - clearing socket.io data');
-      // Mark this as a page reload/closure, not a disconnect
-      sessionStorage.removeItem('pageLoadTimestamp');
+      logDebug('Page is being unloaded (refresh/close)');
+      // Set a flag in sessionStorage to indicate intentional disconnect
+      sessionStorage.setItem('intentionalDisconnect', 'true');
+      // Clear all session data
+      clearSessionData();
+    };
+
+    // Handle visibility change (tab close/switch)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        logDebug('Page visibility changed to hidden');
+        // Only set the timestamp, don't clear data yet as the page might become visible again
+        sessionStorage.setItem('lastVisibilityChange', Date.now().toString());
+      }
+    };
+
+    // Handle actual page unload/close
+    const handleUnload = () => {
+      logDebug('Page is being closed');
+      clearSessionData();
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('unload', handleUnload);
     
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('unload', handleUnload);
     };
   }, []);
 
+  // Update the socket connection handler
   useEffect(() => {
-    logDebug('Initializing socket connection to:', SOCKET_URL);
+    logDebug('Initializing socket connection');
     
+    // Use standard Socket.IO options, relying on the library's built-in reconnection
     const newSocket = io(SOCKET_URL, {
       withCredentials: true,
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
-      timeout: 20000,
-      autoConnect: false,
-      forceNew: false
+      timeout: 20000
     });
 
-    // Set up ping interval
-    let pingInterval: NodeJS.Timeout;
-    
-    // Add connection handler
+    // Set up connection listeners
     newSocket.on('connect', () => {
-      logDebug('Socket CONNECTED', { 
-        id: newSocket.id, 
-        transport: newSocket.io?.engine?.transport?.name || 'unknown'
-      });
+      logDebug('Socket CONNECTED', { id: newSocket.id });
       setIsConnected(true);
-      setIsReconnecting(false);
-      setReconnectAttempts(0);
       
-      // Start sending pings regularly
-      pingInterval = setInterval(() => {
-        if (newSocket.connected) {
-          logDebug('Sending ping to server');
-          newSocket.emit('ping');
-        }
-      }, 20000); // Send ping every 20 seconds
+      // Check if this is a page reload/close (intentional disconnect)
+      const wasIntentionalDisconnect = sessionStorage.getItem('intentionalDisconnect') === 'true';
       
-      // Re-register user if we have one
-      if (currentUser) {
-        logDebug('Re-registering user after reconnection', currentUser.username);
-        registerUserWithServer(newSocket, currentUser);
+      if (wasIntentionalDisconnect) {
+        logDebug('This appears to be a page reload - clearing session');
+        clearSessionData();
+        sessionStorage.removeItem('intentionalDisconnect');
+        return;
       }
+
+      // Try to restore existing user session
+      const storedUser = getStoredUser();
+      const storedIdentity = getStoredIdentity();
+      
+      if (storedUser && storedIdentity) {
+        logDebug('Found existing user session - attempting to restore', { 
+          username: storedUser.username
         });
         
-    // Handle pong responses
-    newSocket.on('pong', () => {
-      logDebug('Received pong from server');
+        const updatedUser = {
+          ...storedUser,
+          id: newSocket.id
+        };
+        
+        saveUser(updatedUser);
+        registerUserWithServer(newSocket, updatedUser);
+        setCurrentUser(updatedUser);
+      }
     });
 
-    // Add disconnect handler with immediate reconnection
+    // Simplified disconnect handler
     newSocket.on('disconnect', (reason) => {
-      logDebug('Socket DISCONNECTED', { reason, socketId: newSocket.id });
+      logDebug('Socket DISCONNECTED', { reason });
       setIsConnected(false);
       
-      // Clear ping interval on disconnect
-      if (pingInterval) {
-        clearInterval(pingInterval);
+      // Only clear session data for intentional client disconnects
+      if (reason === 'io client disconnect' || sessionStorage.getItem('intentionalDisconnect') === 'true') {
+        logDebug('Clearing session data due to intentional disconnect');
+        clearSessionData();
       }
       
-      // If server initiated disconnect or transport close, try to reconnect immediately
-      if (reason === 'io server disconnect' || reason === 'transport close') {
-        logDebug('Server initiated disconnect, attempting immediate reconnection');
-              newSocket.connect();
-            }
-
-      // Show toast for disconnect
-      toast.error('Disconnected from server. Attempting to reconnect...');
+      // Add user-friendly message
+      if (reason === 'io server disconnect') {
+        toast.error('Disconnected by server. Will attempt to reconnect...');
+      } else if (['transport close', 'transport error', 'ping timeout'].includes(reason)) {
+        toast.error('Connection lost. Attempting to reconnect...');
+      }
     });
 
-    // Start the connection
+    // Connect and cleanup
     newSocket.connect();
     setSocket(newSocket);
 
     return () => {
       logDebug('Socket cleanup on component unmount');
-      if (pingInterval) {
-      clearInterval(pingInterval);
-      }
       newSocket.removeAllListeners();
       newSocket.close();
     };
-  }, []); // Empty dependency array to prevent recreation
-
-  // Add recovery mechanism for when connection is lost
-  useEffect(() => {
-    if (socket && !isConnected && currentUser && !isReconnecting) {
-      const reconnectInterval = setInterval(() => {
-        if (!socket.connected) {
-          logDebug('Connection lost, attempting to reconnect...');
-          socket.connect();
-        } else {
-          clearInterval(reconnectInterval);
-        }
-      }, 3000);
-
-      return () => clearInterval(reconnectInterval);
-    }
-  }, [socket, isConnected, currentUser, isReconnecting]);
+  }, []);
 
   // Validate message
   const validateMessage = (content: string): boolean => {
@@ -457,23 +490,20 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   // Create user
   const createUser = useCallback(() => {
-    logDebug('createUser called', { 
-      socketExists: !!socket, 
-      isConnected, 
-      socketId: socket?.id 
-    });
+    logDebug('createUser called');
     
     if (!socket || !isConnected) {
       toast.error('Waiting for server connection...');
       return;
     }
 
-    // Generate a random identity if we don't have one
-    const identity = getStoredIdentity() || `identity_${Math.random().toString(36).substr(2, 9)}`;
+    // Clear any existing session data before creating new user
+    clearSessionData();
+
+    // Generate new user data
+    const identity = `identity_${Math.random().toString(36).substr(2, 9)}`;
     const username = `user_${Math.random().toString(36).substr(2, 6)}`;
     const color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
-    
-    logDebug('Creating new user:', { username, color, identity, socketId: socket.id });
     
     const user: User = {
       id: socket.id,
@@ -482,17 +512,17 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       identity
     };
 
-    // Save user information to sessionStorage
+    // Save new user information
     saveIdentity(identity);
     saveUser(user);
-
-    // Register with server with the persistent identity
-    registerUserWithServer(socket, user);
     
+    // Register with server
+    registerUserWithServer(socket, user);
     setCurrentUser(user);
-    logDebug('Current user state updated');
+    
+    logDebug('New user created:', user);
     toast.success(`Welcome, ${username}!`);
-  }, [socket, isConnected, registerUserWithServer]);
+  }, [socket, isConnected]);
 
   // Update mute check interval to use refs and avoid render updates
   useEffect(() => {
@@ -992,15 +1022,14 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     setRoomMessages(prev => [...prev, systemMessage].slice(-MAX_MESSAGES));
   }, [currentRoom]);
 
-  // Listen for socket events
+  // Simplify the event listeners to focus on application logic rather than connection management
   useEffect(() => {
     if (!socket) return;
 
-    logDebug('Setting up socket event listeners, socket connected:', socket.connected);
+    logDebug('Setting up socket event listeners');
 
     // Listen for online count updates
     socket.on('online_count', (data: { count: number }) => {
-      logDebug('Received online_count update:', data.count);
       setOnlineUsers(data.count);
     });
 
@@ -1016,22 +1045,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       setOnlineUsers(data.onlineCount);
     });
 
-    // Listen for initial online users data
-    socket.on('online_users', (data: { users: User[]; count: number }) => {
-      logDebug('Received initial online users:', data);
-      setOnlineUsers(data.count);
-    });
-
-    // Send a test ping to verify connection
-    if (socket.connected) {
-      logDebug('Sending test ping to verify server connection');
-      socket.emit('ping');
-    }
-
     // Listen for global chat messages
     socket.on('chat_message', (data) => {
-      logDebug('Received chat_message event', data);
-      
       const newMessage: ChatMessage = {
         id: data.id || `${data.senderId}-${data.timestamp}`,
         username: data.senderUsername || 'SYSTEM',
@@ -1045,18 +1060,11 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         type: data.type
       };
       
-      logDebug('Adding message to state:', newMessage);
       setMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
     });
 
     // Listen for room messages
     socket.on('room_message_broadcast', (data) => {
-      logDebug('Received room_message_broadcast', { 
-        id: data.id,
-        roomId: data.roomId,
-        currentRoomId: currentRoom?.id
-      });
-      
       if (currentRoom && data.roomId === currentRoom.id) {
         const newMessage: ChatMessage = {
           id: data.id || `room-${data.timestamp}`,
@@ -1074,16 +1082,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         const isDuplicate = roomMessages.some(msg => msg.id === newMessage.id);
         
         if (!isDuplicate) {
-          logDebug('Adding room message to state');
           setRoomMessages(prev => [...prev, newMessage].slice(-MAX_MESSAGES));
-        } else {
-          logDebug('Duplicate message, not adding');
-          }
-        } else {
-        logDebug('Ignoring message for different room', { 
-          msgRoomId: data.roomId, 
-          currentRoom: currentRoom?.id 
-        });
+        }
       }
     });
 
@@ -1092,33 +1092,34 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       console.error('Socket error:', error);
     });
 
-    // Status check every 5 seconds
-    const interval = setInterval(() => {
-      logDebug('Connection status check', {
-        socketConnected: socket.connected,
-        hasCurrentUser: !!currentUser,
-        messagesCount: messages.length,
-        roomMessagesCount: roomMessages.length
-      });
-    }, 5000);
-
     // Listen for leaderboard updates
     socket.on('leaderboard:data', (data: { users: UserMessageStats[] }) => {
-      logDebug('Received leaderboard update:', data);
       setLeaderboard(data.users);
     });
 
     // Request initial leaderboard data
     socket.emit('leaderboard:request');
 
+    // Check connection every 30 seconds (just for debugging)
+    const connectionCheckInterval = setInterval(() => {
+      if (socket.connected) {
+        logDebug('Connection health check - Connected');
+      } else {
+        logDebug('Connection health check - Disconnected');
+      }
+    }, 30000);
+
     return () => {
-      clearInterval(interval);
+      clearInterval(connectionCheckInterval);
+      socket.off('online_count');
+      socket.off('user_joined');
+      socket.off('user_left');
       socket.off('chat_message');
       socket.off('room_message_broadcast');
       socket.off('error');
       socket.off('leaderboard:data');
     };
-  }, [socket, currentRoom, currentUser]);
+  }, [socket, currentRoom]);
 
   // Add periodic leaderboard refresh
   useEffect(() => {
@@ -1391,21 +1392,37 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         currentUser: !!currentUser,
         hasHackAccess
       });
-      return { success: false, stolenPoints: 0, victims: [] };
+      return { success: false, stolenPoints: 0, victims: [], message: undefined };
     }
 
-    return new Promise<{ success: boolean; stolenPoints: number; victims: string[] }>((resolve) => {
+    return new Promise<{ 
+        success: boolean;
+        stolenPoints: number;
+        victims: string[];
+      message?: string;
+    }>((resolve) => {
       logDebug('Sending execute_hack event');
       
       socket.emit('execute_hack', { 
         userId: currentUser.id,
         targetMode: targetMode || 'random',
         targetUsername
-      }, (response: { 
+      });
+      
+      // Use a timeout to handle the case where the server doesn't respond
+      const timeoutId = setTimeout(() => {
+        toast.error('Hack request timed out. Please try again.');
+        resolve({ success: false, stolenPoints: 0, victims: [], message: 'Request timed out' });
+      }, 5000);
+      
+      // Set up a one-time listener for hack_result
+      const handleHackResult = (response: { 
         success: boolean;
         stolenPoints: number;
         victims: string[];
+        message?: string;
       }) => {
+        clearTimeout(timeoutId);
         logDebug('Received hack response', response);
         
         if (response.success) {
@@ -1427,8 +1444,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
             setMessages(prev => [...prev, systemMessage].slice(-MAX_MESSAGES));
           }
           
-          // Show success notification
-          toast.success(`Hack successful! Stole ${response.stolenPoints} points from ${response.victims.length} user(s)`);
+          // Show success notification with the message from server if available
+          toast.success(response.message || `Hack successful! Stole ${response.stolenPoints} points from ${response.victims.length} user(s)`);
           
           // Our polling will automatically update hack access status
         } else {
@@ -1437,8 +1454,11 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         }
         
         resolve(response);
+      };
+      
+      // Listen for the hack_result event
+      socket.once('hack_result', handleHackResult);
       });
-    });
   }, [socket, currentUser, currentRoom, hasHackAccess, hackAccessInfo]);
 
   // Add listener for user points updates

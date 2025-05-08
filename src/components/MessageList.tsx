@@ -13,7 +13,7 @@ interface MessageListProps {
 
 const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { currentUser, sendMessageReaction, leaderboard } = useChat();
+  const { currentUser, sendMessageReaction, leaderboard, currentRoom } = useChat();
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
   // Add logging for messages updates
@@ -120,7 +120,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
           style={{
             marginLeft: depth > 0 ? `${depth * 12}px` : isSystem ? '10px' : '0',
             ...(isSystem && {
-              background: 'rgba(0, 17, 0, 0.7)',
+              background: currentRoom?.theme === 'premium' ? 'transparent' : 'rgba(0, 17, 0, 0.7)',
               borderRadius: '4px',
               position: 'relative',
               overflow: 'hidden'
@@ -131,6 +131,13 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
             <>
               {/* Animated borders container */}
               <div className="absolute inset-0">
+                {/* Check for premium theme to use Azure Elegance style */}
+                {currentRoom?.theme === 'premium' ? (
+                  // Azure Elegance theme style - WHITE BACKGROUND WITH BLUE BORDER
+                  <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded" style={{ zIndex: 1 }}></div>
+                ) : (
+                  // Default terminal style with glowing borders
+                  <>
                 {/* Top border with breaks and animation */}
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-neon-green/30 animate-glow-pulse" 
                   style={{ 
@@ -175,16 +182,35 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
                   <div className="absolute top-[20%] right-0 w-full h-[10%] bg-[#001100]" />
                   <div className="absolute bottom-[20%] right-0 w-full h-[10%] bg-[#001100]" />
                 </div>
+                  </>
+                )}
               </div>
-              {/* System icon with pulse animation */}
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center animate-pulse">
-                <div className="text-neon-green/70" style={{ textShadow: '0 0 10px rgba(57, 255, 20, 0.5)' }}>⚡</div>
+              {/* System icon with pulse animation - Improved positioning */}
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full" 
+                style={{ 
+                  zIndex: 3,
+                  animation: currentRoom?.theme === 'premium' ? 'none' : 'pulse 2s infinite',
+                  background: currentRoom?.theme === 'premium' ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
+                  border: currentRoom?.theme === 'premium' ? '1px solid #3b82f6' : 'none'
+                }}>
+                <div className={currentRoom?.theme === 'premium' ? "text-blue-800 font-bold text-xl" : "text-neon-green/70"} 
+                  style={{ 
+                    textShadow: currentRoom?.theme === 'premium' 
+                      ? 'none'
+                      : '0 0 10px rgba(57, 255, 20, 0.5)',
+                    transform: currentRoom?.theme === 'premium' ? 'scale(1.2)' : 'none',
+                  }}>
+                  ⚡
+                </div>
               </div>
             </>
           )}
 
-          <div className={cn("flex items-center gap-2", isSystem && "pl-8")}>
-            <span className="text-neon-green/50 font-mono text-xs">{depth > 0 ? '└' : ''}</span>
+          <div className={cn("flex items-center gap-2", isSystem && (currentRoom?.theme === 'premium' ? "pl-10" : "pl-8"))} style={{ position: 'relative', zIndex: 2 }}>
+            <span className={cn(
+              "text-xs font-mono", 
+              currentRoom?.theme === 'premium' && isSystem ? "text-blue-700 font-semibold" : "text-neon-green/50"
+            )}>{depth > 0 ? '└' : ''}</span>
               {!isSystem && (
               <UsernameBadge 
                 username={message.username} 
@@ -195,6 +221,14 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
               )}
               {!isSystem && (
               <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(typeof message.timestamp === 'number' ? message.timestamp : new Date(message.timestamp).getTime(), { addSuffix: true })}
+              </span>
+              )}
+              {isSystem && (
+              <span className={cn(
+                "text-xs",
+                currentRoom?.theme === 'premium' ? "text-blue-700 font-semibold" : "text-neon-green/50"
+              )}>
               {formatDistanceToNow(typeof message.timestamp === 'number' ? message.timestamp : new Date(message.timestamp).getTime(), { addSuffix: true })}
               </span>
               )}
@@ -233,13 +267,21 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onReplyClick }) => 
             )}
           </div>
             
-          <div className={cn("pl-4", isSystem && "pl-8")}>
+          <div className={cn("pl-4", isSystem && (currentRoom?.theme === 'premium' ? "pl-10" : "pl-8"))} style={{ position: 'relative', zIndex: 2 }}>
             <p className={cn(
               "font-mono break-words text-sm md:text-base",
-              isSystem ? "text-neon-green font-medium tracking-wide" : "text-foreground"
+              isSystem ? (
+                currentRoom?.theme === 'premium' 
+                  ? "text-blue-700 font-bold tracking-wide" 
+                  : "text-neon-green font-medium tracking-wide"
+              ) : "text-foreground"
             )}
             style={{
-              textShadow: isSystem ? '0 0 10px rgba(57, 255, 20, 0.3)' : 'none'
+              textShadow: isSystem 
+                ? (currentRoom?.theme === 'premium'
+                    ? 'none'
+                    : '0 0 10px rgba(57, 255, 20, 0.3)')
+                : 'none'
             }}>
               {formatMessageContent(message.content)}
             </p>

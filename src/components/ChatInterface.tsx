@@ -15,7 +15,7 @@ import RoomCreateModal from './RoomCreateModal';
 import RoomJoinModal from './RoomJoinModal';
 import RoomSettings from './RoomSettings';
 import Leaderboard from './Leaderboard';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -457,15 +457,13 @@ const ChatInterface: React.FC = () => {
         hackMode === 'specific' ? hackTarget : undefined
       );
       
-      if (result.success) {
-        toast.success(`Hack successful! Stole ${result.stolenPoints} points from ${result.victims.length} user(s)`);
-      } else {
-        toast.error('Hack failed. Try again later.');
-      }
+      // Success or failure is handled by the executeHack function
+      // which displays the appropriate toast messages
     } catch (error) {
       console.error('Hack error:', error);
       toast.error('Failed to execute hack');
     } finally {
+      // Always ensure we reset the loading state
       setIsHacking(false);
       // Reset hack options
       setHackTarget('');
