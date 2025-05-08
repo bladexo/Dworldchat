@@ -135,7 +135,7 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const SOCKET_URL = import.meta.env.PROD 
-  ? 'https://charming-romola-dinno-3c220cbb.koyeb.app'
+  ? 'https://nutty-annabell-loganrustyy-25293412.koyeb.app'
   : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
 
 // Log socket configuration 
