@@ -138,8 +138,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
   || import.meta.env.VITE_SERVER_URL 
   || 'http://localhost:8000';
 
-// Log socket configuration 
-console.log('[SOCKET CONFIG] Using server URL:', SOCKET_URL, 'Environment:', import.meta.env.MODE);
+
 
 // Room storage - maps room codes to room data
 // This is kept in memory to maintain room metadata across joins
@@ -1359,7 +1358,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
           maxUsages: number | null;
         } | null;
       }) => {
-        logDebug('Hack access poll response:', response);
         
         // Only show notification if hack access changes from false to true
         if (response.hasAccess && !hasHackAccess) {
