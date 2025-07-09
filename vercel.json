@@ -17,7 +17,7 @@
     "silent": false
   },
   "env": {
-    "VITE_DEBUG_MODE": "true",
+    "VITE_DEBUG_MODE": "true"
   },
   "headers": [
     {
