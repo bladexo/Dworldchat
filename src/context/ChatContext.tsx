@@ -134,9 +134,9 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-const SOCKET_URL = import.meta.env.PROD 
-  ? 'https://wrong-myrtice-redmanwords-rw-5ae3b9dd.koyeb.app'
-  : (import.meta.env.VITE_SERVER_URL || 'http://localhost:8000');
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL 
+  || import.meta.env.VITE_SERVER_URL 
+  || 'http://localhost:8000';
 
 // Log socket configuration 
 console.log('[SOCKET CONFIG] Using server URL:', SOCKET_URL, 'Environment:', import.meta.env.MODE);
